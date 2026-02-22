@@ -44,6 +44,53 @@ def read_obj(sha):
     typ = hdr.split()[0] if hdr else ""
     return typ, body
 
+def print_tree(tree_sha):
+    t, tb = read_obj(tree_sha)
+    if t != "tree":
+        print(f"Expected tree object, got {t}: {tree_sha}", file=sys.stderr)
+        raise SystemExit(1)
+    b = tb
+    pos = 0
+    while pos < len(b):
+        sp = b.find(b" ", pos)
+        if sp == -1:
+            break
+        mode = b[pos:sp].decode("ascii", errors="replace")
+        pos = sp + 1
+        nul = b.find(b"\x00", pos)
+        if nul == -1:
+            break
+        name = b[pos:nul].decode("utf-8", errors="replace")
+        pos = nul + 1
+        if pos + 20 > len(b):
+            break
+        sha1 = b[pos:pos + 20].hex()
+        pos += 20
+        kind = "tree" if mode == "40000" else "blob"
+        print(f"{kind} {sha1}    {name}")
+
+def parse_commit(body):
+    text = body.decode("utf-8", errors="replace")
+    lines = text.splitlines()
+    tree_sha = ""
+    parents = []
+    hdr_lines = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        i += 1
+        if line == "":
+            break
+        if line.startswith(("tree ", "parent ", "author ", "committer ")):
+            hdr_lines.append(line)
+        if line.startswith("tree "):
+            tree_sha = line[5:].strip()
+        elif line.startswith("parent "):
+            parents.append(line[7:].strip()
+                         )
+    msg = "\n".join(lines[i:]).rstrip("\n")
+    return hdr_lines, tree_sha, parents, msg
+
 if len(sys.argv) == 2:
     branches = set()
     heads = os.path.join(git, "refs", "heads")
@@ -79,23 +126,11 @@ if typ != "commit":
     print(f"Expected commit object, got {typ}: {sha}", file=sys.stderr)
     raise SystemExit(1)
 
-text = body.decode("utf-8", errors="replace")
-lines = text.splitlines()
+hdr_lines, tree_sha, parents, msg = parse_commit(body)
 
-tree_sha = ""
-i = 0
-while i < len(lines):
-    line = lines[i]
-    i += 1
-    if line == "":
-        break
-    if line.startswith(("tree ", "parent ", "author ", "committer ")):
-        print(line)
-    if line.startswith("tree "):
-        tree_sha = line[5:].strip()
-
+for line in hdr_lines:
+    print(line)
 print()
-msg = "\n".join(lines[i:]).rstrip("\n")
 if msg:
     print(msg)
 
@@ -103,27 +138,20 @@ if not tree_sha:
     print("Commit has no tree field", file=sys.stderr)
     raise SystemExit(1)
 
-t, tb = read_obj(tree_sha)
-if t != "tree":
-    print(f"Expected tree object, got {t}: {tree_sha}", file=sys.stderr)
-    raise SystemExit(1)
+print_tree(tree_sha)
 
-b = tb
-pos = 0
-while pos < len(b):
-    sp = b.find(b" ", pos)
-    if sp == -1:
+cur = sha
+cur_tree = tree_sha
+cur_parents = parents
+
+while True:
+    print(f"TREE for commit {cur}")
+    print_tree(cur_tree)
+    if not cur_parents:
         break
-    mode = b[pos:sp].decode("ascii", errors="replace")
-    pos = sp + 1
-    nul = b.find(b"\x00", pos)
-    if nul == -1:
-        break
-    name = b[pos:nul].decode("utf-8", errors="replace")
-    pos = nul + 1
-    if pos + 20 > len(b):
-        break
-    sha1 = b[pos:pos + 20].hex()
-    pos += 20
-    kind = "tree" if mode == "40000" else "blob"
-    print(f"{kind} {sha1}    {name}")
+    cur = cur_parents[0]
+    t, b = read_obj(cur)
+    if t != "commit":
+        print(f"Expected commit while walking history, got {t}: {cur}", file=sys.stderr)
+        raise SystemExit(1)
+    _, cur_tree, cur_parents, _ = parse_commit(b)
