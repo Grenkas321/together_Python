@@ -32,6 +32,18 @@ def packed_refs():
             out[parts[1]] = parts[0]
     return out
 
+def read_obj(sha):
+    p = os.path.join(git, "objects", sha[:2], sha[2:])
+    if not os.path.isfile(p):
+        print(f"Object not found: {sha}", file=sys.stderr)
+        raise SystemExit(1)
+    data = zlib.decompress(read_bytes(p))
+    nul = data.find(b"\x00")
+    hdr = data[:nul].decode("ascii", errors="replace")
+    body = data[nul + 1:]
+    typ = hdr.split()[0] if hdr else ""
+    return typ, body
+
 if len(sys.argv) == 2:
     branches = set()
     heads = os.path.join(git, "refs", "heads")
@@ -41,7 +53,7 @@ if len(sys.argv) == 2:
                 rel = os.path.relpath(os.path.join(root, fn), heads).replace(os.sep, "/")
                 branches.add(rel)
     pref = "refs/heads/"
-    for ref, sha in packed_refs().items():
+    for ref in packed_refs():
         if ref.startswith(pref):
             branches.add(ref[len(pref):])
     for b in sorted(branches):
@@ -56,24 +68,13 @@ if os.path.isfile(ref_file):
     v = read_text(ref_file).strip()
     sha = v if len(v) == 40 else None
 else:
-    pr = packed_refs()
-    sha = pr.get("refs/heads/" + branch)
+    sha = packed_refs().get("refs/heads/" + branch)
 
 if not sha:
     print(f"Cannot resolve ref: {branch}", file=sys.stderr)
     raise SystemExit(1)
 
-obj_path = os.path.join(git, "objects", sha[:2], sha[2:])
-if not os.path.isfile(obj_path):
-    print(f"Object not found: {sha}", file=sys.stderr)
-    raise SystemExit(1)
-
-data = zlib.decompress(read_bytes(obj_path))
-nul = data.find(b"\x00")
-hdr = data[:nul].decode("ascii", errors="replace")
-typ = hdr.split()[0] if hdr else ""
-body = data[nul + 1:]
-
+typ, body = read_obj(sha)
 if typ != "commit":
     print(f"Expected commit object, got {typ}: {sha}", file=sys.stderr)
     raise SystemExit(1)
@@ -81,6 +82,7 @@ if typ != "commit":
 text = body.decode("utf-8", errors="replace")
 lines = text.splitlines()
 
+tree_sha = ""
 i = 0
 while i < len(lines):
     line = lines[i]
@@ -89,8 +91,39 @@ while i < len(lines):
         break
     if line.startswith(("tree ", "parent ", "author ", "committer ")):
         print(line)
+    if line.startswith("tree "):
+        tree_sha = line[5:].strip()
 
 print()
 msg = "\n".join(lines[i:]).rstrip("\n")
 if msg:
     print(msg)
+
+if not tree_sha:
+    print("Commit has no tree field", file=sys.stderr)
+    raise SystemExit(1)
+
+t, tb = read_obj(tree_sha)
+if t != "tree":
+    print(f"Expected tree object, got {t}: {tree_sha}", file=sys.stderr)
+    raise SystemExit(1)
+
+b = tb
+pos = 0
+while pos < len(b):
+    sp = b.find(b" ", pos)
+    if sp == -1:
+        break
+    mode = b[pos:sp].decode("ascii", errors="replace")
+    pos = sp + 1
+    nul = b.find(b"\x00", pos)
+    if nul == -1:
+        break
+    name = b[pos:nul].decode("utf-8", errors="replace")
+    pos = nul + 1
+    if pos + 20 > len(b):
+        break
+    sha1 = b[pos:pos + 20].hex()
+    pos += 20
+    kind = "tree" if mode == "40000" else "blob"
+    print(f"{kind} {sha1}    {name}")
