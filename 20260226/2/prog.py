@@ -14,8 +14,8 @@ def encounter(x: int, y: int) -> None:
     m = monsters.get((x, y))
     if m is None:
         return
-    name, hello = m
-    print(cowsay.cowsay(hello))
+    hello = m
+    print(cowsay.cowsay(hello, cow = name))
 
 
 player_x, player_y = 0, 0
