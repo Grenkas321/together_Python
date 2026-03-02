@@ -1,5 +1,3 @@
 import shlex
 
-s = input("")
-
-print(shlex.split(s))
+print(shlex.join(shlex.split(input())))
