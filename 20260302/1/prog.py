@@ -37,6 +37,7 @@ def encounter(x: int, y: int) -> None:
 player_x, player_y = 0, 0
 monsters: dict[tuple[int, int], tuple[str, str]] = {}
 
+print("<<< Welcome to Python-MUD 0.1 >>>")
 
 for raw in sys.stdin:
     line = raw.strip()
