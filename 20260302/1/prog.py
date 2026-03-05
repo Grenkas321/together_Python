@@ -3,6 +3,22 @@ import sys
 import cowsay
 
 
+cow = read_dot_cow(StringIO("""
+$the_cow = <<EOC;
+         $thoughts
+          $thoughts
+    ,_                    _,
+    ) '-._  ,_    _,  _.-' (
+    )  _.-'.|\\--//|.'-._  (
+     )'   .'\/o\/o\/'.   `(
+      ) .' . \====/ . '. (
+       )  / <<    >> \  (
+        '-._/``  ``\_.-'
+  jgs     __\\'--'//__
+         (((""`  `"")))
+EOC
+"""))
+
 FIELD_SIZE = 10
 
 
