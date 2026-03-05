@@ -31,12 +31,65 @@ def encounter(x: int, y: int) -> None:
     m = monsters.get((x, y))
     if m is None:
         return
-    hello = m
-    print(cowsay.cowsay(hello, cow = name))
+    name, hello, _hp = m
+    print(cowsay.cowsay(hello, cow=name))
+
+
+def parse_addmon_args(parts: list[str]) -> tuple[int, int, str, int] | None:
+    params: dict[str, str | tuple[str, str]] = {}
+    i = 2
+    while i < len(parts):
+        key = parts[i]
+        if key == "hello":
+            if "hello" in params or i + 1 >= len(parts):
+                return None
+            params["hello"] = parts[i + 1]
+            i += 2
+            continue
+
+        if key == "hp":
+            if "hp" in params or i + 1 >= len(parts):
+                return None
+            params["hp"] = parts[i + 1]
+            i += 2
+            continue
+
+        if key == "coords":
+            if "coords" in params or i + 2 >= len(parts):
+                return None
+            params["coords"] = (parts[i + 1], parts[i + 2])
+            i += 3
+            continue
+
+        return None
+
+    if "hello" not in params or "hp" not in params or "coords" not in params:
+        return None
+
+    hp_raw = params["hp"]
+    coords_raw = params["coords"]
+    if not isinstance(hp_raw, str) or not isinstance(coords_raw, tuple):
+        return None
+
+    try:
+        hp = int(hp_raw)
+        x = int(coords_raw[0])
+        y = int(coords_raw[1])
+    except ValueError:
+        return None
+
+    if hp <= 0:
+        return None
+
+    hello_raw = params["hello"]
+    if not isinstance(hello_raw, str):
+        return None
+    hello = hello_raw
+    return x, y, hello, hp
 
 
 player_x, player_y = 0, 0
-monsters: dict[tuple[int, int], tuple[str, str]] = {}
+monsters: dict[tuple[int, int], tuple[str, str, int]] = {}
 
 print("<<< Welcome to Python-MUD 0.1 >>>")
 
@@ -72,29 +125,28 @@ for raw in sys.stdin:
         continue
 
     if cmd == "addmon":
-        if len(parts) != 5:
+        if len(parts) < 2:
             print("Invalid arguments")
             continue
 
-        name = parts[1]
-        if name not in cowsay.list_cows():
+        monster_name = parts[1]
+        if monster_name not in cowsay.list_cows():
             print("Cannot add unknown monster")
             continue
-        try:
-            x = int(parts[2])
-            y = int(parts[3])
-        except ValueError:
+
+        parsed = parse_addmon_args(parts)
+        if parsed is None:
             print("Invalid arguments")
             continue
 
-        hello = parts[4]
+        x, y, hello, hp = parsed
         x = _wrap(x)
         y = _wrap(y)
 
         replaced = (x, y) in monsters
-        monsters[(x, y)] = hello
+        monsters[(x, y)] = (monster_name, hello, hp)
 
-        print(f"Added monster {name} to ({x}, {y}) saying {hello}")
+        print(f"Added monster {monster_name} to ({x}, {y}) saying {hello}")
         if replaced:
             print("Replaced the old monster")
 
