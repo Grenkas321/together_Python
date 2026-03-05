@@ -1,8 +1,9 @@
 import sys
 import shlex
+from io import StringIO
 
 import cowsay
-
+from cowsay import read_dot_cow
 
 cow = read_dot_cow(StringIO("""
 $the_cow = <<EOC;
