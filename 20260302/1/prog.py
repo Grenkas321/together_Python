@@ -1,4 +1,5 @@
 import sys
+import shlex
 
 import cowsay
 
@@ -44,7 +45,12 @@ for raw in sys.stdin:
     if not line:
         continue
 
-    parts = line.split()
+    try:
+        parts = shlex.split(line)
+    except ValueError:
+        print("Invalid arguments")
+        continue
+
     cmd = parts[0]
 
     if cmd in ("up", "down", "left", "right"):
