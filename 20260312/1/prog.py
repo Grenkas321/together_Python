@@ -24,159 +24,160 @@ EOC
 FIELD_SIZE = 10
 
 
-def _wrap(v: int) -> int:
-    return v % FIELD_SIZE
+class Game:
+    def __init__(self) -> None:
+        self.player_x = 0
+        self.player_y = 0
+        self.monsters: dict[tuple[int, int], tuple[str, str, int]] = {}
 
+    def _wrap(self, v: int) -> int:
+        return v % FIELD_SIZE
 
-def encounter(x: int, y: int) -> None:
-    m = monsters.get((x, y))
-    if m is None:
-        return
-    name, hello, _hp = m
-    if name == "jgsbat":
-        print(cowsay.cowsay(hello, cowfile=cow))
-    else:
-        print(cowsay.cowsay(hello, cow=name))
-
-
-def parse_addmon_args(parts: list[str]) -> tuple[int, int, str, int] | None:
-    params: dict[str, str | tuple[str, str]] = {}
-    i = 2
-    while i < len(parts):
-        key = parts[i]
-        if key == "hello":
-            if "hello" in params or i + 1 >= len(parts):
-                return None
-            params["hello"] = parts[i + 1]
-            i += 2
-            continue
-
-        if key == "hp":
-            if "hp" in params or i + 1 >= len(parts):
-                return None
-            params["hp"] = parts[i + 1]
-            i += 2
-            continue
-
-        if key == "coords":
-            if "coords" in params or i + 2 >= len(parts):
-                return None
-            params["coords"] = (parts[i + 1], parts[i + 2])
-            i += 3
-            continue
-
-        return None
-
-    if "hello" not in params or "hp" not in params or "coords" not in params:
-        return None
-
-    hp_raw = params["hp"]
-    coords_raw = params["coords"]
-    if not isinstance(hp_raw, str) or not isinstance(coords_raw, tuple):
-        return None
-
-    try:
-        hp = int(hp_raw)
-        x = int(coords_raw[0])
-        y = int(coords_raw[1])
-    except ValueError:
-        return None
-
-    if hp <= 0:
-        return None
-
-    hello_raw = params["hello"]
-    if not isinstance(hello_raw, str):
-        return None
-    hello = hello_raw
-    return x, y, hello, hp
-
-
-player_x, player_y = 0, 0
-monsters: dict[tuple[int, int], tuple[str, str, int]] = {}
-
-
-def execute_command(line: str) -> None:
-    global player_x, player_y
-
-    line = line.strip()
-    if not line:
-        return
-
-    try:
-        parts = shlex.split(line)
-    except ValueError:
-        print("Invalid arguments")
-        return
-
-    command = parts[0]
-
-    if command in ("up", "down", "left", "right"):
-        if len(parts) != 1:
-            print("Invalid arguments")
+    def encounter(self, x: int, y: int) -> None:
+        m = self.monsters.get((x, y))
+        if m is None:
             return
-
-        if command == "up":
-            player_y = _wrap(player_y - 1)
-        elif command == "down":
-            player_y = _wrap(player_y + 1)
-        elif command == "left":
-            player_x = _wrap(player_x - 1)
+        name, hello, _hp = m
+        if name == "jgsbat":
+            print(cowsay.cowsay(hello, cowfile=cow))
         else:
-            player_x = _wrap(player_x + 1)
+            print(cowsay.cowsay(hello, cow=name))
 
-        print(f"Moved to ({player_x}, {player_y})")
-        encounter(player_x, player_y)
-        return
+    def parse_addmon_args(self, parts: list[str]) -> tuple[int, int, str, int] | None:
+        params: dict[str, str | tuple[str, str]] = {}
+        i = 2
+        while i < len(parts):
+            key = parts[i]
+            if key == "hello":
+                if "hello" in params or i + 1 >= len(parts):
+                    return None
+                params["hello"] = parts[i + 1]
+                i += 2
+                continue
 
-    if command == "addmon":
-        if len(parts) < 2:
+            if key == "hp":
+                if "hp" in params or i + 1 >= len(parts):
+                    return None
+                params["hp"] = parts[i + 1]
+                i += 2
+                continue
+
+            if key == "coords":
+                if "coords" in params or i + 2 >= len(parts):
+                    return None
+                params["coords"] = (parts[i + 1], parts[i + 2])
+                i += 3
+                continue
+
+            return None
+
+        if "hello" not in params or "hp" not in params or "coords" not in params:
+            return None
+
+        hp_raw = params["hp"]
+        coords_raw = params["coords"]
+        if not isinstance(hp_raw, str) or not isinstance(coords_raw, tuple):
+            return None
+
+        try:
+            hp = int(hp_raw)
+            x = int(coords_raw[0])
+            y = int(coords_raw[1])
+        except ValueError:
+            return None
+
+        if hp <= 0:
+            return None
+
+        hello_raw = params["hello"]
+        if not isinstance(hello_raw, str):
+            return None
+        hello = hello_raw
+        return x, y, hello, hp
+
+    def execute(self, line: str) -> None:
+        line = line.strip()
+        if not line:
+            return
+
+        try:
+            parts = shlex.split(line)
+        except ValueError:
             print("Invalid arguments")
             return
 
-        monster_name = parts[1]
-        if monster_name not in cowsay.list_cows() and monster_name != "jgsbat":
-            print("Cannot add unknown monster")
+        command = parts[0]
+
+        if command in ("up", "down", "left", "right"):
+            if len(parts) != 1:
+                print("Invalid arguments")
+                return
+
+            if command == "up":
+                self.player_y = self._wrap(self.player_y - 1)
+            elif command == "down":
+                self.player_y = self._wrap(self.player_y + 1)
+            elif command == "left":
+                self.player_x = self._wrap(self.player_x - 1)
+            else:
+                self.player_x = self._wrap(self.player_x + 1)
+
+            print(f"Moved to ({self.player_x}, {self.player_y})")
+            self.encounter(self.player_x, self.player_y)
             return
 
-        parsed = parse_addmon_args(parts)
-        if parsed is None:
-            print("Invalid arguments")
+        if command == "addmon":
+            if len(parts) < 2:
+                print("Invalid arguments")
+                return
+
+            monster_name = parts[1]
+            if monster_name not in cowsay.list_cows() and monster_name != "jgsbat":
+                print("Cannot add unknown monster")
+                return
+
+            parsed = self.parse_addmon_args(parts)
+            if parsed is None:
+                print("Invalid arguments")
+                return
+
+            x, y, hello, hp = parsed
+            x = self._wrap(x)
+            y = self._wrap(y)
+
+            replaced = (x, y) in self.monsters
+            self.monsters[(x, y)] = (monster_name, hello, hp)
+
+            print(f"Added monster {monster_name} to ({x}, {y}) saying {hello}")
+            if replaced:
+                print("Replaced the old monster")
             return
 
-        x, y, hello, hp = parsed
-        x = _wrap(x)
-        y = _wrap(y)
-
-        replaced = (x, y) in monsters
-        monsters[(x, y)] = (monster_name, hello, hp)
-
-        print(f"Added monster {monster_name} to ({x}, {y}) saying {hello}")
-        if replaced:
-            print("Replaced the old monster")
-        return
-
-    print("Invalid command")
+        print("Invalid command")
 
 
 class MUDShell(cmd.Cmd):
     intro = "<<< Welcome to Python-MUD 0.1 >>>"
     prompt = "(mud) "
 
+    def __init__(self, game: Game) -> None:
+        super().__init__()
+        self.game = game
+
     def do_up(self, arg: str) -> None:
-        execute_command("up" if not arg else f"up {arg}")
+        self.game.execute("up" if not arg else f"up {arg}")
 
     def do_down(self, arg: str) -> None:
-        execute_command("down" if not arg else f"down {arg}")
+        self.game.execute("down" if not arg else f"down {arg}")
 
     def do_left(self, arg: str) -> None:
-        execute_command("left" if not arg else f"left {arg}")
+        self.game.execute("left" if not arg else f"left {arg}")
 
     def do_right(self, arg: str) -> None:
-        execute_command("right" if not arg else f"right {arg}")
+        self.game.execute("right" if not arg else f"right {arg}")
 
     def do_addmon(self, arg: str) -> None:
-        execute_command(f"addmon {arg}")
+        self.game.execute(f"addmon {arg}")
 
     def emptyline(self) -> bool:
         return False
@@ -187,4 +188,5 @@ class MUDShell(cmd.Cmd):
 
 
 if __name__ == "__main__":
-    MUDShell().cmdloop()
+    game = Game()
+    MUDShell(game).cmdloop()
