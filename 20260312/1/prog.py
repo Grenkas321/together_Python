@@ -33,7 +33,10 @@ def encounter(x: int, y: int) -> None:
     if m is None:
         return
     name, hello, _hp = m
-    print(cowsay.cowsay(hello, cow=name))
+    if name == "jgsbat":
+        print(cowsay.cowsay(hello, cowfile=cow))
+    else:
+        print(cowsay.cowsay(hello, cow=name))
 
 
 def parse_addmon_args(parts: list[str]) -> tuple[int, int, str, int] | None:
@@ -92,53 +95,54 @@ def parse_addmon_args(parts: list[str]) -> tuple[int, int, str, int] | None:
 player_x, player_y = 0, 0
 monsters: dict[tuple[int, int], tuple[str, str, int]] = {}
 
-print("<<< Welcome to Python-MUD 0.1 >>>")
 
-for raw in sys.stdin:
-    line = raw.strip()
+def execute_command(line: str) -> None:
+    global player_x, player_y
+
+    line = line.strip()
     if not line:
-        continue
+        return
 
     try:
         parts = shlex.split(line)
     except ValueError:
         print("Invalid arguments")
-        continue
+        return
 
-    cmd = parts[0]
+    command = parts[0]
 
-    if cmd in ("up", "down", "left", "right"):
+    if command in ("up", "down", "left", "right"):
         if len(parts) != 1:
             print("Invalid arguments")
-            continue
+            return
 
-        if cmd == "up":
+        if command == "up":
             player_y = _wrap(player_y - 1)
-        elif cmd == "down":
+        elif command == "down":
             player_y = _wrap(player_y + 1)
-        elif cmd == "left":
+        elif command == "left":
             player_x = _wrap(player_x - 1)
-        else: 
+        else:
             player_x = _wrap(player_x + 1)
 
         print(f"Moved to ({player_x}, {player_y})")
         encounter(player_x, player_y)
-        continue
+        return
 
-    if cmd == "addmon":
+    if command == "addmon":
         if len(parts) < 2:
             print("Invalid arguments")
-            continue
+            return
 
         monster_name = parts[1]
-        if monster_name not in cowsay.list_cows():
+        if monster_name not in cowsay.list_cows() and monster_name != "jgsbat":
             print("Cannot add unknown monster")
-            continue
+            return
 
         parsed = parse_addmon_args(parts)
         if parsed is None:
             print("Invalid arguments")
-            continue
+            return
 
         x, y, hello, hp = parsed
         x = _wrap(x)
@@ -150,8 +154,37 @@ for raw in sys.stdin:
         print(f"Added monster {monster_name} to ({x}, {y}) saying {hello}")
         if replaced:
             print("Replaced the old monster")
-
-        continue
+        return
 
     print("Invalid command")
 
+
+class MUDShell(cmd.Cmd):
+    intro = "<<< Welcome to Python-MUD 0.1 >>>"
+    prompt = "(mud) "
+
+    def do_up(self, arg: str) -> None:
+        execute_command("up" if not arg else f"up {arg}")
+
+    def do_down(self, arg: str) -> None:
+        execute_command("down" if not arg else f"down {arg}")
+
+    def do_left(self, arg: str) -> None:
+        execute_command("left" if not arg else f"left {arg}")
+
+    def do_right(self, arg: str) -> None:
+        execute_command("right" if not arg else f"right {arg}")
+
+    def do_addmon(self, arg: str) -> None:
+        execute_command(f"addmon {arg}")
+
+    def emptyline(self) -> bool:
+        return False
+
+    def do_EOF(self, arg: str) -> bool:
+        print()
+        return True
+
+
+if __name__ == "__main__":
+    MUDShell().cmdloop()
