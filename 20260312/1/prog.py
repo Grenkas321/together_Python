@@ -43,6 +43,9 @@ class Game:
         else:
             print(cowsay.cowsay(hello, cow=name))
 
+    def available_monsters(self) -> list[str]:
+        return sorted(set(cowsay.list_cows()) | {"jgsbat"})
+
     def parse_addmon_args(self, parts: list[str]) -> tuple[int, int, str, int] | None:
         params: dict[str, str | tuple[str, str]] = {}
         i = 2
@@ -96,7 +99,11 @@ class Game:
         return x, y, hello, hp
 
     def attack(self, parts: list[str]) -> None:
-        if len(parts) != 1:
+        if len(parts) == 1:
+            monster_name = None
+        elif len(parts) == 2:
+            monster_name = parts[1]
+        else:
             print("Invalid arguments")
             return
 
@@ -104,10 +111,18 @@ class Game:
         monster = self.monsters.get(pos)
 
         if monster is None:
-            print("No monster here")
+            if monster_name is None:
+                print("No monster here")
+            else:
+                print(f"No {monster_name} here")
             return
 
         name, hello, hp = monster
+
+        if monster_name is not None and name != monster_name:
+            print(f"No {monster_name} here")
+            return
+
         damage = min(10, hp)
         hp -= damage
 
@@ -157,7 +172,7 @@ class Game:
                 return
 
             monster_name = parts[1]
-            if monster_name not in cowsay.list_cows() and monster_name != "jgsbat":
+            if monster_name not in self.available_monsters():
                 print("Cannot add unknown monster")
                 return
 
