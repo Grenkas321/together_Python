@@ -38,6 +38,9 @@ class Game:
     def _wrap(self, v: int) -> int:
         return v % FIELD_SIZE
 
+    def available_monsters(self) -> list[str]:
+        return sorted(set(cowsay.list_cows()) | {"jgsbat"})
+
     def encounter(self, x: int, y: int) -> None:
         m = self.monsters.get((x, y))
         if m is None:
@@ -47,9 +50,6 @@ class Game:
             print(cowsay.cowsay(hello, cowfile=cow))
         else:
             print(cowsay.cowsay(hello, cow=name))
-
-    def available_monsters(self) -> list[str]:
-        return sorted(set(cowsay.list_cows()) | {"jgsbat"})
 
     def parse_addmon_args(self, parts: list[str]) -> tuple[int, int, str, int] | None:
         params: dict[str, str | tuple[str, str]] = {}
@@ -239,36 +239,87 @@ class MUDShell(cmd.Cmd):
     def do_up(self, arg: str) -> None:
         self.game.execute("up" if not arg else f"up {arg}")
 
+    def help_up(self) -> None:
+        print("up")
+        print("    Move player one cell up.")
+
     def do_down(self, arg: str) -> None:
         self.game.execute("down" if not arg else f"down {arg}")
+
+    def help_down(self) -> None:
+        print("down")
+        print("    Move player one cell down.")
 
     def do_left(self, arg: str) -> None:
         self.game.execute("left" if not arg else f"left {arg}")
 
+    def help_left(self) -> None:
+        print("left")
+        print("    Move player one cell left.")
+
     def do_right(self, arg: str) -> None:
         self.game.execute("right" if not arg else f"right {arg}")
+
+    def help_right(self) -> None:
+        print("right")
+        print("    Move player one cell right.")
 
     def do_addmon(self, arg: str) -> None:
         self.game.execute(f"addmon {arg}")
 
+    def help_addmon(self) -> None:
+        print('addmon <monster_name> hello <message> hp <hp> coords <x> <y>')
+        print("    Add monster to the field.")
+        print("    Example:")
+        print('    addmon dragon hello "I am dragon" hp 30 coords 2 3')
+
     def do_attack(self, arg: str) -> None:
         self.game.execute("attack" if not arg else f"attack {arg}")
 
+    def help_attack(self) -> None:
+        print("attack")
+        print("attack with <weapon>")
+        print("attack <monster_name>")
+        print("attack <monster_name> with <weapon>")
+        print("    Attack monster in current cell.")
+        print("    Weapons: sword, spear, axe")
+
+    def help_help(self) -> None:
+        print("help [command]")
+        print("    Show help for command.")
+
     def complete_attack(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
+        before = line[:begidx]
+
+        try:
+            tokens = shlex.split(before)
+        except ValueError:
+            tokens = before.split()
+
+        monsters = self.game.available_monsters()
         weapons = list(WEAPONS.keys())
-        parts = line.split()
 
         if line.endswith(" "):
-            if parts == ["attack"]:
+            if tokens == ["attack"]:
+                return monsters + ["with"]
+            if tokens == ["attack", "with"]:
+                return weapons
+            if len(tokens) == 2 and tokens[0] == "attack" and tokens[1] != "with":
                 return ["with"]
-            if parts == ["attack", "with"]:
+            if len(tokens) == 3 and tokens[0] == "attack" and tokens[2] == "with":
                 return weapons
 
-        if len(parts) == 2 and parts[0] == "attack":
-            if "with".startswith(text):
-                return ["with"]
+        if len(tokens) == 1 and tokens[0] == "attack":
+            return [m for m in monsters if m.startswith(text)] + (
+                ["with"] if "with".startswith(text) else []
+            )
 
-        if len(parts) == 3 and parts[0] == "attack" and parts[1] == "with":
+        if len(tokens) == 2 and tokens[0] == "attack":
+            if tokens[1] == "with":
+                return [w for w in weapons if w.startswith(text)]
+            return [m for m in monsters if m.startswith(text)]
+
+        if len(tokens) == 3 and tokens[0] == "attack" and tokens[2] == "with":
             return [w for w in weapons if w.startswith(text)]
 
         return []
