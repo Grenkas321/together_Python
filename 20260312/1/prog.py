@@ -226,6 +226,25 @@ class MUDShell(cmd.Cmd):
     def do_attack(self, arg: str) -> None:
         self.game.execute("attack" if not arg else f"attack {arg}")
 
+    def complete_attack(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
+        weapons = list(WEAPONS.keys())
+        parts = line.split()
+
+        if line.endswith(" "):
+            if parts == ["attack"]:
+                return ["with"]
+            if parts == ["attack", "with"]:
+                return weapons
+
+        if len(parts) == 2 and parts[0] == "attack":
+            if "with".startswith(text):
+                return ["with"]
+
+        if len(parts) == 3 and parts[0] == "attack" and parts[1] == "with":
+            return [w for w in weapons if w.startswith(text)]
+
+        return []
+
     def emptyline(self) -> bool:
         return False
 
