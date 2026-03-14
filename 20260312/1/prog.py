@@ -103,65 +103,66 @@ class Game:
         hello = hello_raw
         return x, y, hello, hp
 
-def attack(self, parts: list[str]) -> None:
-    monster_name = None
-    weapon_name = "sword"
+    def attack(self, parts: list[str]) -> None:
+        monster_name = None
+        weapon_name = "sword"
 
-    args = parts[1:]
+        args = parts[1:]
 
-    if not args:
-        pass
-    elif len(args) == 1:
-        if args[0] == "with":
-            print("Invalid arguments")
-            return
-        monster_name = args[0]
-    elif len(args) == 2:
-        if args[0] != "with":
-            print("Invalid arguments")
-            return
-        weapon_name = args[1]
-    elif len(args) == 3:
-        if args[1] != "with":
-            print("Invalid arguments")
-            return
-        monster_name = args[0]
-        weapon_name = args[2]
-    else:
-        print("Invalid arguments")
-        return
-
-    if weapon_name not in WEAPONS:
-        print("Unknown weapon")
-        return
-
-    pos = (self.player_x, self.player_y)
-    monster = self.monsters.get(pos)
-
-    if monster is None:
-        if monster_name is None:
-            print("No monster here")
+        if not args:
+            pass
+        elif len(args) == 1:
+            if args[0] == "with":
+                print("Invalid arguments")
+                return
+            monster_name = args[0]
+        elif len(args) == 2:
+            if args[0] != "with":
+                print("Invalid arguments")
+                return
+            weapon_name = args[1]
+        elif len(args) == 3:
+            if args[1] != "with":
+                print("Invalid arguments")
+                return
+            monster_name = args[0]
+            weapon_name = args[2]
         else:
+            print("Invalid arguments")
+            return
+
+        if weapon_name not in WEAPONS:
+            print("Unknown weapon")
+            return
+
+        pos = (self.player_x, self.player_y)
+        monster = self.monsters.get(pos)
+
+        if monster is None:
+            if monster_name is None:
+                print("No monster here")
+            else:
+                print(f"No {monster_name} here")
+            return
+
+        current_name, hello, hp = monster
+
+        if monster_name is not None and current_name != monster_name:
             print(f"No {monster_name} here")
-        return
+            return
 
-    current_name, hello, hp = monster
+        damage = min(WEAPONS[weapon_name], hp)
+        hp -= damage
 
-    if monster_name is not None and current_name != monster_name:
-        print(f"No {monster_name} here")
-        return
+        print(f"Attacked {current_name}, damage {damage} hp")
 
-    damage = min(WEAPONS[weapon_name], hp)
-    hp -= damage
+        if hp == 0:
+            print(f"{current_name} died")
+            del self.monsters[pos]
+        else:
+            self.monsters[pos] = (current_name, hello, hp)
+            print(f"{current_name} now has {hp}")
 
-    print(f"Attacked {current_name}, damage {damage} hp")
-
-    if hp == 0:
-        print(f"{current_name} died")
-        del self.monsters[pos]
-    else:
-        self.monsters[pos] = (current_name, hello, hp)
-        print(f"{current_name} now has {hp}")
     def execute(self, line: str) -> None:
         line = line.strip()
         if not line:
