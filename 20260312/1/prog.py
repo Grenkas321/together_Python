@@ -1,4 +1,4 @@
-import sys
+import cmd
 import shlex
 from io import StringIO
 
