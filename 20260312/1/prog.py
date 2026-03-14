@@ -95,6 +95,31 @@ class Game:
         hello = hello_raw
         return x, y, hello, hp
 
+    def attack(self, parts: list[str]) -> None:
+        if len(parts) != 1:
+            print("Invalid arguments")
+            return
+
+        pos = (self.player_x, self.player_y)
+        monster = self.monsters.get(pos)
+
+        if monster is None:
+            print("No monster here")
+            return
+
+        name, hello, hp = monster
+        damage = min(10, hp)
+        hp -= damage
+
+        print(f"Attacked {name}, damage {damage} hp")
+
+        if hp == 0:
+            print(f"{name} died")
+            del self.monsters[pos]
+        else:
+            self.monsters[pos] = (name, hello, hp)
+            print(f"{name} now has {hp}")
+
     def execute(self, line: str) -> None:
         line = line.strip()
         if not line:
@@ -153,6 +178,10 @@ class Game:
                 print("Replaced the old monster")
             return
 
+        if command == "attack":
+            self.attack(parts)
+            return
+
         print("Invalid command")
 
 
@@ -178,6 +207,9 @@ class MUDShell(cmd.Cmd):
 
     def do_addmon(self, arg: str) -> None:
         self.game.execute(f"addmon {arg}")
+
+    def do_attack(self, arg: str) -> None:
+        self.game.execute("attack" if not arg else f"attack {arg}")
 
     def emptyline(self) -> bool:
         return False
