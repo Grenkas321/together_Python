@@ -22,6 +22,11 @@ EOC
 """))
 
 FIELD_SIZE = 10
+WEAPONS = {
+    "sword": 10,
+    "spear": 15,
+    "axe": 20,
+}
 
 
 class Game:
@@ -96,8 +101,18 @@ class Game:
         return x, y, hello, hp
 
     def attack(self, parts: list[str]) -> None:
-        if len(parts) != 1:
+        weapon_name = "sword"
+
+        if len(parts) == 1:
+            pass
+        elif len(parts) == 3 and parts[1] == "with":
+            weapon_name = parts[2]
+        else:
             print("Invalid arguments")
+            return
+
+        if weapon_name not in WEAPONS:
+            print("Unknown weapon")
             return
 
         pos = (self.player_x, self.player_y)
@@ -108,7 +123,7 @@ class Game:
             return
 
         name, hello, hp = monster
-        damage = min(10, hp)
+        damage = min(WEAPONS[weapon_name], hp)
         hp -= damage
 
         print(f"Attacked {name}, damage {damage} hp")
