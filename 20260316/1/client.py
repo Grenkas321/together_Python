@@ -42,6 +42,150 @@ def render_monster(name: str, text: str) -> str:
     return cowsay.cowsay(text, cow=name)
 
 
+def parse_addmon_args(parts: list[str]) -> tuple[int, int, str, int] | None:
+    params: dict[str, str | tuple[str, str]] = {}
+    i = 2
+
+    while i < len(parts):
+        key = parts[i]
+
+        if key == "hello":
+            if "hello" in params or i + 1 >= len(parts):
+                return None
+            params["hello"] = parts[i + 1]
+            i += 2
+            continue
+
+        if key == "hp":
+            if "hp" in params or i + 1 >= len(parts):
+                return None
+            params["hp"] = parts[i + 1]
+            i += 2
+            continue
+
+        if key == "coords":
+            if "coords" in params or i + 2 >= len(parts):
+                return None
+            params["coords"] = (parts[i + 1], parts[i + 2])
+            i += 3
+            continue
+
+        return None
+
+    if "hello" not in params or "hp" not in params or "coords" not in params:
+        return None
+
+    hp_raw = params["hp"]
+    coords_raw = params["coords"]
+    hello_raw = params["hello"]
+
+    if not isinstance(hp_raw, str) or not isinstance(coords_raw, tuple) or not isinstance(hello_raw, str):
+        return None
+
+    try:
+        hp = int(hp_raw)
+        x = int(coords_raw[0])
+        y = int(coords_raw[1])
+    except ValueError:
+        return None
+
+    if hp <= 0:
+        return None
+
+    return x, y, hello_raw, hp
+
+
+def parse_attack_args(parts: list[str]) -> tuple[str | None, str] | None:
+    monster_name = None
+    weapon_name = "sword"
+
+    args = parts[1:]
+
+    if not args:
+        pass
+    elif len(args) == 1:
+        if args[0] == "with":
+            return None
+        monster_name = args[0]
+    elif len(args) == 2:
+        if args[0] != "with":
+            return None
+        weapon_name = args[1]
+    elif len(args) == 3:
+        if args[1] != "with":
+            return None
+        monster_name = args[0]
+        weapon_name = args[2]
+    else:
+        return None
+
+    return monster_name, weapon_name
+
+
+def translate_user_command(line: str) -> tuple[str | None, str | None]:
+    line = line.strip()
+    if not line:
+        return None, None
+
+    try:
+        parts = shlex.split(line)
+    except ValueError:
+        return None, "Invalid arguments"
+
+    command = parts[0]
+
+    if command == "up":
+        if len(parts) != 1:
+            return None, "Invalid arguments"
+        return "move 0 -1", None
+
+    if command == "down":
+        if len(parts) != 1:
+            return None, "Invalid arguments"
+        return "move 0 1", None
+
+    if command == "left":
+        if len(parts) != 1:
+            return None, "Invalid arguments"
+        return "move -1 0", None
+
+    if command == "right":
+        if len(parts) != 1:
+            return None, "Invalid arguments"
+        return "move 1 0", None
+
+    if command == "addmon":
+        if len(parts) < 2:
+            return None, "Invalid arguments"
+
+        monster_name = parts[1]
+        if monster_name not in available_monsters():
+            return None, "Cannot add unknown monster"
+
+        parsed = parse_addmon_args(parts)
+        if parsed is None:
+            return None, "Invalid arguments"
+
+        x, y, hello, hp = parsed
+        return f"addmon {monster_name} {x} {y} {hp} {shlex.quote(hello)}", None
+
+    if command == "attack":
+        parsed = parse_attack_args(parts)
+        if parsed is None:
+            return None, "Invalid arguments"
+
+        monster_name, weapon_name = parsed
+
+        if weapon_name not in WEAPONS:
+            return None, "Unknown weapon"
+
+        target = monster_name if monster_name is not None else "_current_"
+        damage = WEAPONS[weapon_name]
+        return f"attack {target} {damage}", None
+
+    return None, "Invalid command"
+
+
 class NetworkClient:
     def __init__(self, host: str = "127.0.0.1", port: int = 1337) -> None:
         self.sock = socket.create_connection((host, port))
@@ -53,7 +197,7 @@ class NetworkClient:
         self.writer.flush()
         response_line = self.reader.readline()
         if not response_line:
-            return ["Server disconnected"]
+            return ["ERROR Server disconnected"]
         return json.loads(response_line)
 
     def close(self) -> None:
@@ -70,51 +214,87 @@ class MUDClientShell(cmd.Cmd):
         super().__init__()
         self.transport = transport
 
-    def _run(self, line: str) -> None:
-        for msg in self.transport.request(line):
-            if msg.startswith("ENCOUNTER "):
+    def _print_response(self, response: list[str]) -> None:
+        for msg in response:
+            if msg.startswith("MOVED "):
+                _, x, y = msg.split()
+                print(f"Moved to ({x}, {y})")
+            elif msg.startswith("ENCOUNTER "):
                 _, name, hello = msg.split(" ", 2)
                 print(render_monster(name, hello))
+            elif msg.startswith("ADDED "):
+                _, name, x, y, hello = msg.split(" ", 4)
+                print(f"Added monster {name} to ({x}, {y}) saying {hello}")
+            elif msg == "REPLACED":
+                print("Replaced the old monster")
+            elif msg == "NO_MONSTER":
+                print("No monster here")
+            elif msg.startswith("NO_MONSTER "):
+                _, name = msg.split(" ", 1)
+                print(f"No {name} here")
+            elif msg.startswith("ATTACKED "):
+                _, name, damage = msg.split()
+                print(f"Attacked {name}, damage {damage} hp")
+            elif msg == "DIED":
+                # имя уже напечатали строкой выше, тут не знаем его отдельно
+                pass
+            elif msg.startswith("HP "):
+                _, hp = msg.split()
+                print(f"Monster now has {hp}")
+            elif msg.startswith("ERROR "):
+                _, text = msg.split(" ", 1)
+                print(text)
             else:
                 print(msg)
 
+    def _run_user_command(self, line: str) -> None:
+        protocol_line, error = translate_user_command(line)
+        if error is not None:
+            print(error)
+            return
+        if protocol_line is None:
+            return
+
+        response = self.transport.request(protocol_line)
+        self._print_response(response)
+
     def do_up(self, arg: str) -> None:
-        self._run("up" if not arg else f"up {arg}")
+        self._run_user_command("up" if not arg else f"up {arg}")
 
     def help_up(self) -> None:
         print("up")
         print("    Move player one cell up.")
 
     def do_down(self, arg: str) -> None:
-        self._run("down" if not arg else f"down {arg}")
+        self._run_user_command("down" if not arg else f"down {arg}")
 
     def help_down(self) -> None:
         print("down")
         print("    Move player one cell down.")
 
     def do_left(self, arg: str) -> None:
-        self._run("left" if not arg else f"left {arg}")
+        self._run_user_command("left" if not arg else f"left {arg}")
 
     def help_left(self) -> None:
         print("left")
         print("    Move player one cell left.")
 
     def do_right(self, arg: str) -> None:
-        self._run("right" if not arg else f"right {arg}")
+        self._run_user_command("right" if not arg else f"right {arg}")
 
     def help_right(self) -> None:
         print("right")
         print("    Move player one cell right.")
 
     def do_addmon(self, arg: str) -> None:
-        self._run(f"addmon {arg}")
+        self._run_user_command(f"addmon {arg}")
 
     def help_addmon(self) -> None:
         print('addmon <monster_name> hello <message> hp <hp> coords <x> <y>')
         print('    Example: addmon dragon hello "I am dragon" hp 30 coords 2 3')
 
     def do_attack(self, arg: str) -> None:
-        self._run("attack" if not arg else f"attack {arg}")
+        self._run_user_command("attack" if not arg else f"attack {arg}")
 
     def help_attack(self) -> None:
         print("attack")
