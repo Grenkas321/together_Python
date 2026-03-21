@@ -192,12 +192,12 @@ class NetworkClient:
         self.reader = self.sock.makefile("r", encoding="utf-8")
         self.writer = self.sock.makefile("w", encoding="utf-8")
 
-    def request(self, line: str) -> list[str]:
+    def request(self, line: str) -> dict:
         self.writer.write(line + "\n")
         self.writer.flush()
         response_line = self.reader.readline()
         if not response_line:
-            return ["ERROR Server disconnected"]
+            return {"type": "error", "message": "Server disconnected"}
         return json.loads(response_line)
 
     def close(self) -> None:
@@ -214,38 +214,41 @@ class MUDClientShell(cmd.Cmd):
         super().__init__()
         self.transport = transport
 
-    def _print_response(self, response: list[str]) -> None:
-        for msg in response:
-            if msg.startswith("MOVED "):
-                _, x, y = msg.split()
-                print(f"Moved to ({x}, {y})")
-            elif msg.startswith("ENCOUNTER "):
-                _, name, hello = msg.split(" ", 2)
-                print(render_monster(name, hello))
-            elif msg.startswith("ADDED "):
-                _, name, x, y, hello = msg.split(" ", 4)
-                print(f"Added monster {name} to ({x}, {y}) saying {hello}")
-            elif msg == "REPLACED":
+    def _print_response(self, response: dict) -> None:
+        response_type = response["type"]
+
+        if response_type == "move":
+            print(f"Moved to ({response['x']}, {response['y']})")
+            encounter = response["encounter"]
+            if encounter is not None:
+                print(render_monster(encounter["name"], encounter["hello"]))
+            return
+
+        if response_type == "addmon":
+            print(
+                f"Added monster {response['name']} to ({response['x']}, {response['y']}) "
+                f"saying {response['hello']}"
+            )
+            if response["replaced"]:
                 print("Replaced the old monster")
-            elif msg == "NO_MONSTER":
-                print("No monster here")
-            elif msg.startswith("NO_MONSTER "):
-                _, name = msg.split(" ", 1)
-                print(f"No {name} here")
-            elif msg.startswith("ATTACKED "):
-                _, name, damage = msg.split()
-                print(f"Attacked {name}, damage {damage} hp")
-            elif msg == "DIED":
-                # имя уже напечатали строкой выше, тут не знаем его отдельно
-                pass
-            elif msg.startswith("HP "):
-                _, hp = msg.split()
-                print(f"Monster now has {hp}")
-            elif msg.startswith("ERROR "):
-                _, text = msg.split(" ", 1)
-                print(text)
+            return
+
+        if response_type == "attack":
+            if response["result"] == "no_monster":
+                if response["name"] is None:
+                    print("No monster here")
+                else:
+                    print(f"No {response['name']} here")
+                return
+
+            print(f"Attacked {response['name']}, damage {response['damage']} hp")
+            if response["hp"] == 0:
+                print(f"{response['name']} died")
             else:
-                print(msg)
+                print(f"{response['name']} now has {response['hp']}")
+            return
+
+        print(response.get("message", "Unknown server response"))
 
     def _run_user_command(self, line: str) -> None:
         protocol_line, error = translate_user_command(line)

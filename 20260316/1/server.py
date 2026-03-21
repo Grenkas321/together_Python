@@ -14,7 +14,7 @@ class GameServer:
     def _wrap(self, value: int) -> int:
         return value % FIELD_SIZE
 
-    def handle_command(self, line: str) -> list[str]:
+    def handle_command(self, line: str) -> dict:
         parts = shlex.split(line)
         command = parts[0]
 
@@ -25,14 +25,21 @@ class GameServer:
             self.player_x = self._wrap(self.player_x + dx)
             self.player_y = self._wrap(self.player_y + dy)
 
-            lines = [f"MOVED {self.player_x} {self.player_y}"]
-
+            encounter = None
             monster = self.monsters.get((self.player_x, self.player_y))
             if monster is not None:
                 name, hello, _hp = monster
-                lines.append(f"ENCOUNTER {name} {hello}")
+                encounter = {
+                    "name": name,
+                    "hello": hello,
+                }
 
-            return lines
+            return {
+                "type": "move",
+                "x": self.player_x,
+                "y": self.player_y,
+                "encounter": encounter,
+            }
 
         if command == "addmon":
             monster_name = parts[1]
@@ -44,10 +51,14 @@ class GameServer:
             replaced = (x, y) in self.monsters
             self.monsters[(x, y)] = (monster_name, hello, hp)
 
-            lines = [f"ADDED {monster_name} {x} {y} {hello}"]
-            if replaced:
-                lines.append("REPLACED")
-            return lines
+            return {
+                "type": "addmon",
+                "name": monster_name,
+                "x": x,
+                "y": y,
+                "hello": hello,
+                "replaced": replaced,
+            }
 
         if command == "attack":
             requested_name = parts[1]
@@ -57,30 +68,41 @@ class GameServer:
             monster = self.monsters.get(pos)
 
             if monster is None:
-                if requested_name == "_current_":
-                    return ["NO_MONSTER"]
-                return [f"NO_MONSTER {requested_name}"]
+                return {
+                    "type": "attack",
+                    "result": "no_monster",
+                    "name": None if requested_name == "_current_" else requested_name,
+                }
 
             current_name, hello, hp = monster
 
             if requested_name != "_current_" and requested_name != current_name:
-                return [f"NO_MONSTER {requested_name}"]
+                return {
+                    "type": "attack",
+                    "result": "no_monster",
+                    "name": requested_name,
+                }
 
             damage = min(damage_limit, hp)
             hp -= damage
 
-            lines = [f"ATTACKED {current_name} {damage}"]
-
             if hp == 0:
-                lines.append("DIED")
                 del self.monsters[pos]
             else:
                 self.monsters[pos] = (current_name, hello, hp)
-                lines.append(f"HP {hp}")
 
-            return lines
+            return {
+                "type": "attack",
+                "result": "ok",
+                "name": current_name,
+                "damage": damage,
+                "hp": hp,
+            }
 
-        return ["ERROR Invalid command"]
+        return {
+            "type": "error",
+            "message": "Invalid command",
+        }
 
 
 def serve(host: str = "127.0.0.1", port: int = 1337) -> None:
