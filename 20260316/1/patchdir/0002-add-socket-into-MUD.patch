@@ -1,0 +1,227 @@
+From a7936faf51c07a5dd69521ecdc1edf9357056419 Mon Sep 17 00:00:00 2001
+From: Renkas Vladislav <Renkasvv@my.msu.ru>
+Date: Sat, 21 Mar 2026 12:30:09 +0300
+Subject: [PATCH 2/4] add socket into MUD
+
+---
+ 20260316/1/__pycache__/server.cpython-313.pyc | Bin 0 -> 6979 bytes
+ 20260316/1/client.py                          |  47 +++++++++++++++---
+ 20260316/1/server.py                          |  26 +++++++++-
+ 3 files changed, 66 insertions(+), 7 deletions(-)
+ create mode 100644 20260316/1/__pycache__/server.cpython-313.pyc
+
+diff --git a/20260316/1/__pycache__/server.cpython-313.pyc b/20260316/1/__pycache__/server.cpython-313.pyc
+new file mode 100644
+index 0000000000000000000000000000000000000000..ddf60ef1e42602ec61aec1919a19da83e6c9b857
+GIT binary patch
+literal 6979
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/20260316/1/client.py b/20260316/1/client.py
+index c1c0ebd..875e799 100644
+--- a/20260316/1/client.py
++++ b/20260316/1/client.py
+@@ -1,11 +1,22 @@
+ import cmd
++import json
+ import shlex
++import socket
+ from io import StringIO
+ 
+ import cowsay
+ from cowsay import read_dot_cow
+ 
+-from server import GameServer, WEAPONS, available_monsters
++
++WEAPONS = {
++    "sword": 10,
++    "spear": 15,
++    "axe": 20,
++}
++
++
++def available_monsters() -> list[str]:
++    return sorted(set(cowsay.list_cows()) | {"jgsbat"})
+ 
+ 
+ jgsbat = read_dot_cow(StringIO("""
+@@ -31,16 +42,36 @@ def render_monster(name: str, text: str) -> str:
+     return cowsay.cowsay(text, cow=name)
+ 
+ 
++class NetworkClient:
++    def __init__(self, host: str = "127.0.0.1", port: int = 1337) -> None:
++        self.sock = socket.create_connection((host, port))
++        self.reader = self.sock.makefile("r", encoding="utf-8")
++        self.writer = self.sock.makefile("w", encoding="utf-8")
++
++    def request(self, line: str) -> list[str]:
++        self.writer.write(line + "\n")
++        self.writer.flush()
++        response_line = self.reader.readline()
++        if not response_line:
++            return ["Server disconnected"]
++        return json.loads(response_line)
++
++    def close(self) -> None:
++        self.reader.close()
++        self.writer.close()
++        self.sock.close()
++
++
+ class MUDClientShell(cmd.Cmd):
+     intro = "<<< Welcome to Python-MUD 0.1 >>>"
+     prompt = "(mud) "
+ 
+-    def __init__(self, server: GameServer) -> None:
++    def __init__(self, transport: NetworkClient) -> None:
+         super().__init__()
+-        self.server = server
++        self.transport = transport
+ 
+     def _run(self, line: str) -> None:
+-        for msg in self.server.handle_command(line):
++        for msg in self.transport.request(line):
+             if msg.startswith("ENCOUNTER "):
+                 _, name, hello = msg.split(" ", 2)
+                 print(render_monster(name, hello))
+@@ -137,9 +168,13 @@ class MUDClientShell(cmd.Cmd):
+ 
+     def do_EOF(self, arg: str) -> bool:
+         print()
++        self.transport.close()
+         return True
+ 
+ 
+ if __name__ == "__main__":
+-    server = GameServer()
+-    MUDClientShell(server).cmdloop()
+\ No newline at end of file
++    transport = NetworkClient()
++    try:
++        MUDClientShell(transport).cmdloop()
++    finally:
++        transport.close()
+\ No newline at end of file
+diff --git a/20260316/1/server.py b/20260316/1/server.py
+index f24bc17..b308c9e 100644
+--- a/20260316/1/server.py
++++ b/20260316/1/server.py
+@@ -1,4 +1,6 @@
++import json
+ import shlex
++import socket
+ 
+ FIELD_SIZE = 10
+ WEAPONS = {
+@@ -202,4 +204,26 @@ class GameServer:
+ 
+             return lines
+ 
+-        return ["Invalid command"]
+\ No newline at end of file
++        return ["Invalid command"]
++
++
++def serve(host: str = "127.0.0.1", port: int = 1337) -> None:
++    game = GameServer()
++
++    with socket.create_server((host, port)) as server_socket:
++        print(f"Server listening on {host}:{port}")
++
++        conn, addr = server_socket.accept()
++        with conn:
++            print(f"Client connected: {addr}")
++            reader = conn.makefile("r", encoding="utf-8")
++            writer = conn.makefile("w", encoding="utf-8")
++
++            for line in reader:
++                response = game.handle_command(line.rstrip("\n"))
++                writer.write(json.dumps(response, ensure_ascii=False) + "\n")
++                writer.flush()
++
++
++if __name__ == "__main__":
++    serve()
+\ No newline at end of file
+-- 
+2.49.0.windows.1
+

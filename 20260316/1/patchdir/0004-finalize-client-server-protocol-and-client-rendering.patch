@@ -1,0 +1,216 @@
+From 6318ccbde3e4ab760f8f596615b95569a286157f Mon Sep 17 00:00:00 2001
+From: Renkas Vladislav <Renkasvv@my.msu.ru>
+Date: Sat, 21 Mar 2026 12:33:51 +0300
+Subject: [PATCH 4/4] finalize client-server protocol and client rendering
+
+---
+ 20260316/1/client.py | 67 +++++++++++++++++++++++---------------------
+ 20260316/1/server.py | 64 ++++++++++++++++++++++++++++--------------
+ 2 files changed, 78 insertions(+), 53 deletions(-)
+
+diff --git a/20260316/1/client.py b/20260316/1/client.py
+index 2e5b2f8..4681387 100644
+--- a/20260316/1/client.py
++++ b/20260316/1/client.py
+@@ -192,12 +192,12 @@ class NetworkClient:
+         self.reader = self.sock.makefile("r", encoding="utf-8")
+         self.writer = self.sock.makefile("w", encoding="utf-8")
+ 
+-    def request(self, line: str) -> list[str]:
++    def request(self, line: str) -> dict:
+         self.writer.write(line + "\n")
+         self.writer.flush()
+         response_line = self.reader.readline()
+         if not response_line:
+-            return ["ERROR Server disconnected"]
++            return {"type": "error", "message": "Server disconnected"}
+         return json.loads(response_line)
+ 
+     def close(self) -> None:
+@@ -214,38 +214,41 @@ class MUDClientShell(cmd.Cmd):
+         super().__init__()
+         self.transport = transport
+ 
+-    def _print_response(self, response: list[str]) -> None:
+-        for msg in response:
+-            if msg.startswith("MOVED "):
+-                _, x, y = msg.split()
+-                print(f"Moved to ({x}, {y})")
+-            elif msg.startswith("ENCOUNTER "):
+-                _, name, hello = msg.split(" ", 2)
+-                print(render_monster(name, hello))
+-            elif msg.startswith("ADDED "):
+-                _, name, x, y, hello = msg.split(" ", 4)
+-                print(f"Added monster {name} to ({x}, {y}) saying {hello}")
+-            elif msg == "REPLACED":
++    def _print_response(self, response: dict) -> None:
++        response_type = response["type"]
++
++        if response_type == "move":
++            print(f"Moved to ({response['x']}, {response['y']})")
++            encounter = response["encounter"]
++            if encounter is not None:
++                print(render_monster(encounter["name"], encounter["hello"]))
++            return
++
++        if response_type == "addmon":
++            print(
++                f"Added monster {response['name']} to ({response['x']}, {response['y']}) "
++                f"saying {response['hello']}"
++            )
++            if response["replaced"]:
+                 print("Replaced the old monster")
+-            elif msg == "NO_MONSTER":
+-                print("No monster here")
+-            elif msg.startswith("NO_MONSTER "):
+-                _, name = msg.split(" ", 1)
+-                print(f"No {name} here")
+-            elif msg.startswith("ATTACKED "):
+-                _, name, damage = msg.split()
+-                print(f"Attacked {name}, damage {damage} hp")
+-            elif msg == "DIED":
+-                # имя уже напечатали строкой выше, тут не знаем его отдельно
+-                pass
+-            elif msg.startswith("HP "):
+-                _, hp = msg.split()
+-                print(f"Monster now has {hp}")
+-            elif msg.startswith("ERROR "):
+-                _, text = msg.split(" ", 1)
+-                print(text)
++            return
++
++        if response_type == "attack":
++            if response["result"] == "no_monster":
++                if response["name"] is None:
++                    print("No monster here")
++                else:
++                    print(f"No {response['name']} here")
++                return
++
++            print(f"Attacked {response['name']}, damage {response['damage']} hp")
++            if response["hp"] == 0:
++                print(f"{response['name']} died")
+             else:
+-                print(msg)
++                print(f"{response['name']} now has {response['hp']}")
++            return
++
++        print(response.get("message", "Unknown server response"))
+ 
+     def _run_user_command(self, line: str) -> None:
+         protocol_line, error = translate_user_command(line)
+diff --git a/20260316/1/server.py b/20260316/1/server.py
+index e6f4b8f..e79f140 100644
+--- a/20260316/1/server.py
++++ b/20260316/1/server.py
+@@ -14,7 +14,7 @@ class GameServer:
+     def _wrap(self, value: int) -> int:
+         return value % FIELD_SIZE
+ 
+-    def handle_command(self, line: str) -> list[str]:
++    def handle_command(self, line: str) -> dict:
+         parts = shlex.split(line)
+         command = parts[0]
+ 
+@@ -25,14 +25,21 @@ class GameServer:
+             self.player_x = self._wrap(self.player_x + dx)
+             self.player_y = self._wrap(self.player_y + dy)
+ 
+-            lines = [f"MOVED {self.player_x} {self.player_y}"]
+-
++            encounter = None
+             monster = self.monsters.get((self.player_x, self.player_y))
+             if monster is not None:
+                 name, hello, _hp = monster
+-                lines.append(f"ENCOUNTER {name} {hello}")
+-
+-            return lines
++                encounter = {
++                    "name": name,
++                    "hello": hello,
++                }
++
++            return {
++                "type": "move",
++                "x": self.player_x,
++                "y": self.player_y,
++                "encounter": encounter,
++            }
+ 
+         if command == "addmon":
+             monster_name = parts[1]
+@@ -44,10 +51,14 @@ class GameServer:
+             replaced = (x, y) in self.monsters
+             self.monsters[(x, y)] = (monster_name, hello, hp)
+ 
+-            lines = [f"ADDED {monster_name} {x} {y} {hello}"]
+-            if replaced:
+-                lines.append("REPLACED")
+-            return lines
++            return {
++                "type": "addmon",
++                "name": monster_name,
++                "x": x,
++                "y": y,
++                "hello": hello,
++                "replaced": replaced,
++            }
+ 
+         if command == "attack":
+             requested_name = parts[1]
+@@ -57,30 +68,41 @@ class GameServer:
+             monster = self.monsters.get(pos)
+ 
+             if monster is None:
+-                if requested_name == "_current_":
+-                    return ["NO_MONSTER"]
+-                return [f"NO_MONSTER {requested_name}"]
++                return {
++                    "type": "attack",
++                    "result": "no_monster",
++                    "name": None if requested_name == "_current_" else requested_name,
++                }
+ 
+             current_name, hello, hp = monster
+ 
+             if requested_name != "_current_" and requested_name != current_name:
+-                return [f"NO_MONSTER {requested_name}"]
++                return {
++                    "type": "attack",
++                    "result": "no_monster",
++                    "name": requested_name,
++                }
+ 
+             damage = min(damage_limit, hp)
+             hp -= damage
+ 
+-            lines = [f"ATTACKED {current_name} {damage}"]
+-
+             if hp == 0:
+-                lines.append("DIED")
+                 del self.monsters[pos]
+             else:
+                 self.monsters[pos] = (current_name, hello, hp)
+-                lines.append(f"HP {hp}")
+-
+-            return lines
+ 
+-        return ["ERROR Invalid command"]
++            return {
++                "type": "attack",
++                "result": "ok",
++                "name": current_name,
++                "damage": damage,
++                "hp": hp,
++            }
++
++        return {
++            "type": "error",
++            "message": "Invalid command",
++        }
+ 
+ 
+ def serve(host: str = "127.0.0.1", port: int = 1337) -> None:
+-- 
+2.49.0.windows.1
+
