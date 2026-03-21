@@ -1,11 +1,22 @@
 import cmd
+import json
 import shlex
+import socket
 from io import StringIO
 
 import cowsay
 from cowsay import read_dot_cow
 
-from server import GameServer, WEAPONS, available_monsters
+
+WEAPONS = {
+    "sword": 10,
+    "spear": 15,
+    "axe": 20,
+}
+
+
+def available_monsters() -> list[str]:
+    return sorted(set(cowsay.list_cows()) | {"jgsbat"})
 
 
 jgsbat = read_dot_cow(StringIO("""
@@ -31,16 +42,36 @@ def render_monster(name: str, text: str) -> str:
     return cowsay.cowsay(text, cow=name)
 
 
+class NetworkClient:
+    def __init__(self, host: str = "127.0.0.1", port: int = 1337) -> None:
+        self.sock = socket.create_connection((host, port))
+        self.reader = self.sock.makefile("r", encoding="utf-8")
+        self.writer = self.sock.makefile("w", encoding="utf-8")
+
+    def request(self, line: str) -> list[str]:
+        self.writer.write(line + "\n")
+        self.writer.flush()
+        response_line = self.reader.readline()
+        if not response_line:
+            return ["Server disconnected"]
+        return json.loads(response_line)
+
+    def close(self) -> None:
+        self.reader.close()
+        self.writer.close()
+        self.sock.close()
+
+
 class MUDClientShell(cmd.Cmd):
     intro = "<<< Welcome to Python-MUD 0.1 >>>"
     prompt = "(mud) "
 
-    def __init__(self, server: GameServer) -> None:
+    def __init__(self, transport: NetworkClient) -> None:
         super().__init__()
-        self.server = server
+        self.transport = transport
 
     def _run(self, line: str) -> None:
-        for msg in self.server.handle_command(line):
+        for msg in self.transport.request(line):
             if msg.startswith("ENCOUNTER "):
                 _, name, hello = msg.split(" ", 2)
                 print(render_monster(name, hello))
@@ -137,9 +168,13 @@ class MUDClientShell(cmd.Cmd):
 
     def do_EOF(self, arg: str) -> bool:
         print()
+        self.transport.close()
         return True
 
 
 if __name__ == "__main__":
-    server = GameServer()
-    MUDClientShell(server).cmdloop()
+    transport = NetworkClient()
+    try:
+        MUDClientShell(transport).cmdloop()
+    finally:
+        transport.close()

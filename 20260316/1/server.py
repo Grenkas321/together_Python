@@ -1,4 +1,6 @@
+import json
 import shlex
+import socket
 
 FIELD_SIZE = 10
 WEAPONS = {
@@ -203,3 +205,25 @@ class GameServer:
             return lines
 
         return ["Invalid command"]
+
+
+def serve(host: str = "127.0.0.1", port: int = 1337) -> None:
+    game = GameServer()
+
+    with socket.create_server((host, port)) as server_socket:
+        print(f"Server listening on {host}:{port}")
+
+        conn, addr = server_socket.accept()
+        with conn:
+            print(f"Client connected: {addr}")
+            reader = conn.makefile("r", encoding="utf-8")
+            writer = conn.makefile("w", encoding="utf-8")
+
+            for line in reader:
+                response = game.handle_command(line.rstrip("\n"))
+                writer.write(json.dumps(response, ensure_ascii=False) + "\n")
+                writer.flush()
+
+
+if __name__ == "__main__":
+    serve()
