@@ -1,11 +1,19 @@
 import cmd
 import json
+import queue
 import shlex
 import socket
+import threading
 from io import StringIO
 
-import cowsay
-from cowsay import read_dot_cow
+try:
+    import cowsay
+    from cowsay import read_dot_cow
+except ModuleNotFoundError:
+    cowsay = None
+
+    def read_dot_cow(_source):
+        return None
 
 
 WEAPONS = {
@@ -17,10 +25,14 @@ WEAPONS = {
 
 
 def available_monsters() -> list[str]:
-    return sorted(set(cowsay.list_cows()) | {"jgsbat"})
+    monsters = {"jgsbat"}
+    if cowsay is not None:
+        monsters.update(cowsay.list_cows())
+    return sorted(monsters)
 
 
-jgsbat = read_dot_cow(StringIO("""
+if cowsay is not None:
+    jgsbat = read_dot_cow(StringIO("""
 $the_cow = <<EOC;
          $thoughts
           $thoughts
@@ -35,9 +47,14 @@ $the_cow = <<EOC;
          (((""`  `"")))
 EOC
 """))
+else:
+    jgsbat = None
 
 
 def render_monster(name: str, text: str) -> str:
+    if cowsay is None:
+        return f"{name} says: {text}"
+
     if name == "jgsbat":
         return cowsay.cowsay(text, cowfile=jgsbat)
     return cowsay.cowsay(text, cow=name)
@@ -160,7 +177,7 @@ def translate_user_command(line: str) -> tuple[str | None, str | None]:
             return None, "Invalid arguments"
 
         monster_name = parts[1]
-        if monster_name not in available_monsters():
+        if cowsay is not None and monster_name not in available_monsters():
             return None, "Cannot add unknown monster"
 
         parsed = parse_addmon_args(parts)
@@ -184,6 +201,11 @@ def translate_user_command(line: str) -> tuple[str | None, str | None]:
         damage = WEAPONS[weapon_name]
         return f"attack {target} {damage}", None
 
+    if command == "sayall":
+        if len(parts) != 2:
+            return None, "Invalid arguments"
+        return f"sayall {shlex.quote(parts[1])}", None
+
     return None, "Invalid command"
 
 
@@ -192,19 +214,61 @@ class NetworkClient:
         self.sock = socket.create_connection((host, port))
         self.reader = self.sock.makefile("r", encoding="utf-8")
         self.writer = self.sock.makefile("w", encoding="utf-8")
+        self.responses: queue.Queue[dict] = queue.Queue()
+        self.closed = False
+
+        self.listener = threading.Thread(target=self._reader_loop, daemon=True)
+        self.listener.start()
+
+    def _reader_loop(self) -> None:
+        while not self.closed:
+            response_line = self.reader.readline()
+            if not response_line:
+                self.responses.put({"type": "error", "message": "Server disconnected"})
+                return
+
+            try:
+                response = json.loads(response_line)
+            except json.JSONDecodeError:
+                self.responses.put({"type": "error", "message": "Invalid server response"})
+                continue
+
+            if response.get("type") == "sayall" and "from" in response:
+                print(f"\n{response['from']}: {response['message']}")
+                print("(mud) ", end="", flush=True)
+                continue
+
+            self.responses.put(response)
 
     def request(self, line: str) -> dict:
-        self.writer.write(line + "\n")
-        self.writer.flush()
-        response_line = self.reader.readline()
-        if not response_line:
-            return {"type": "error", "message": "Server disconnected"}
-        return json.loads(response_line)
+        try:
+            self.writer.write(line + "\n")
+            self.writer.flush()
+        except OSError:
+            return {"type": "error", "message": "Failed to send request"}
+
+        return self.responses.get()
 
     def close(self) -> None:
-        self.reader.close()
-        self.writer.close()
-        self.sock.close()
+        if self.closed:
+            return
+        self.closed = True
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        try:
+            self.reader.close()
+        except OSError:
+            pass
+        try:
+            self.writer.close()
+        except OSError:
+            pass
+        try:
+            self.sock.close()
+        except OSError:
+            pass
 
 
 class MUDClientShell(cmd.Cmd):
@@ -247,6 +311,10 @@ class MUDClientShell(cmd.Cmd):
                 print(f"{response['name']} died")
             else:
                 print(f"{response['name']} now has {response['hp']}")
+            return
+
+        if response_type == "sayall" and response.get("result") == "ok":
+            print("Message sent")
             return
 
         print(response.get("message", "Unknown server response"))
@@ -305,7 +373,17 @@ class MUDClientShell(cmd.Cmd):
         print("attack with <weapon>")
         print("attack <monster_name>")
         print("attack <monster_name> with <weapon>")
-        print("    Weapons: sword, spear, axe")
+        print("    Weapons: sword, spear, axe, FIRE SWORD")
+
+    def do_sayall(self, arg: str) -> None:
+        self._run_user_command(f"sayall {arg}")
+
+    def help_sayall(self) -> None:
+        print("sayall <message>")
+        print('    Send message to all players.')
+        print('    Examples:')
+        print('    sayall PREVED')
+        print('    sayall "Let\'s attack dragon at 5 9"')
 
     def help_help(self) -> None:
         print("help [command]")
@@ -345,6 +423,13 @@ class MUDClientShell(cmd.Cmd):
         if len(tokens) == 3 and tokens[0] == "attack" and tokens[2] == "with":
             return [w for w in weapons if w.startswith(text)]
 
+        return []
+
+    def completenames(self, text: str, *ignored) -> list[str]:
+        commands = ["up", "down", "left", "right", "addmon", "attack", "sayall", "help"]
+        return [name for name in commands if name.startswith(text)]
+
+    def complete_sayall(self, text: str, line: str, begidx: int, endidx: int) -> list[str]:
         return []
 
     def emptyline(self) -> bool:
