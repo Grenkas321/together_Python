@@ -351,10 +351,15 @@ def handle_client_connection(
             game.remove_player(player)
 
 
-def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
+def serve(
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    enable_monster_wander: bool = True,
+) -> None:
     """Start the MOOD server and serve clients forever."""
     game = GameServer()
-    game.start_monster_wanderer()
+    if enable_monster_wander:
+        game.start_monster_wanderer()
     try:
         with socket.create_server((host, port)) as server_socket:
             print(f"Server listening on {host}:{port}")
@@ -367,4 +372,5 @@ def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
                 )
                 thread.start()
     finally:
-        game.stop_monster_wanderer()
+        if enable_monster_wander:
+            game.stop_monster_wanderer()

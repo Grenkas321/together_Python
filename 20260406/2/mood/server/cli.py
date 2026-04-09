@@ -17,11 +17,20 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="TCP port to listen on.",
     )
+    parser.add_argument(
+        "--no-monster-wander",
+        action="store_true",
+        help="Disable automatic wandering monsters for deterministic testing.",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the MOOD server from the command line."""
     args = build_parser().parse_args(argv)
-    serve(host=args.host, port=args.port)
+    serve(
+        host=args.host,
+        port=args.port,
+        enable_monster_wander=not args.no_monster_wander,
+    )
     return 0

@@ -67,19 +67,21 @@ class MUDClientShell(cmd.Cmd):
 
         print(response.get("message", "Unknown server response"))
 
-    def _run_user_command(self, line: str) -> None:
+    def run_command(self, line: str) -> bool:
+        """Parse, send and print the result of a single user command."""
         protocol_line, error = translate_user_command(line)
         if error is not None:
             print(error)
-            return
+            return False
         if protocol_line is None:
-            return
+            return False
         response = self.transport.request(protocol_line)
         self._print_response(response)
+        return True
 
     def do_up(self, arg: str) -> None:
         """Move the player one cell up."""
-        self._run_user_command("up" if not arg else f"up {arg}")
+        self.run_command("up" if not arg else f"up {arg}")
 
     def help_up(self) -> None:
         """Show help for the up command."""
@@ -88,7 +90,7 @@ class MUDClientShell(cmd.Cmd):
 
     def do_down(self, arg: str) -> None:
         """Move the player one cell down."""
-        self._run_user_command("down" if not arg else f"down {arg}")
+        self.run_command("down" if not arg else f"down {arg}")
 
     def help_down(self) -> None:
         """Show help for the down command."""
@@ -97,7 +99,7 @@ class MUDClientShell(cmd.Cmd):
 
     def do_left(self, arg: str) -> None:
         """Move the player one cell left."""
-        self._run_user_command("left" if not arg else f"left {arg}")
+        self.run_command("left" if not arg else f"left {arg}")
 
     def help_left(self) -> None:
         """Show help for the left command."""
@@ -106,7 +108,7 @@ class MUDClientShell(cmd.Cmd):
 
     def do_right(self, arg: str) -> None:
         """Move the player one cell right."""
-        self._run_user_command("right" if not arg else f"right {arg}")
+        self.run_command("right" if not arg else f"right {arg}")
 
     def help_right(self) -> None:
         """Show help for the right command."""
@@ -115,7 +117,7 @@ class MUDClientShell(cmd.Cmd):
 
     def do_addmon(self, arg: str) -> None:
         """Add a monster to the playing field."""
-        self._run_user_command(f"addmon {arg}")
+        self.run_command(f"addmon {arg}")
 
     def help_addmon(self) -> None:
         """Show help for the addmon command."""
@@ -124,7 +126,7 @@ class MUDClientShell(cmd.Cmd):
 
     def do_attack(self, arg: str) -> None:
         """Attack the current monster or a named monster."""
-        self._run_user_command("attack" if not arg else f"attack {arg}")
+        self.run_command("attack" if not arg else f"attack {arg}")
 
     def help_attack(self) -> None:
         """Show help for the attack command."""
@@ -136,7 +138,7 @@ class MUDClientShell(cmd.Cmd):
 
     def do_sayall(self, arg: str) -> None:
         """Send a broadcast message to all players."""
-        self._run_user_command(f"sayall {arg}")
+        self.run_command(f"sayall {arg}")
 
     def help_sayall(self) -> None:
         """Show help for the sayall command."""
