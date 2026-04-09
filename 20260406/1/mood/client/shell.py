@@ -57,6 +57,14 @@ class MUDClientShell(cmd.Cmd):
             print("Message sent")
             return
 
+        if response_type == "monster_move":
+            print(response["message"])
+            return
+
+        if response_type == "encounter":
+            print(render_monster(response["name"], response["hello"]))
+            return
+
         print(response.get("message", "Unknown server response"))
 
     def _run_user_command(self, line: str) -> None:

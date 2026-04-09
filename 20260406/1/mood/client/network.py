@@ -5,6 +5,7 @@ import queue
 import socket
 import threading
 
+from mood.client.rendering import render_monster
 from mood.common.constants import DEFAULT_HOST, DEFAULT_PORT, SHELL_PROMPT
 from mood.common.protocol import Payload, error_response
 
@@ -20,6 +21,26 @@ class NetworkClient:
         self.closed = False
         self.listener = threading.Thread(target=self._reader_loop, daemon=True)
         self.listener.start()
+
+    def _print_async_message(self, message: str) -> None:
+        """Print an asynchronous server event and restore the shell prompt."""
+        print(f"\n{message}")
+        print(SHELL_PROMPT, end="", flush=True)
+
+    def _handle_async_response(self, response: Payload) -> bool:
+        """Handle responses that should not block a command round-trip."""
+        if response.get("type") == "sayall" and "from" in response:
+            self._print_async_message(f"{response['from']}: {response['message']}")
+            return True
+        if response.get("type") == "monster_move":
+            self._print_async_message(str(response["message"]))
+            return True
+        if response.get("type") == "encounter":
+            self._print_async_message(
+                render_monster(str(response["name"]), str(response["hello"]))
+            )
+            return True
+        return False
 
     def _reader_loop(self) -> None:
         while not self.closed:
@@ -40,9 +61,7 @@ class NetworkClient:
                 self.responses.put(error_response("Invalid server response"))
                 continue
 
-            if response.get("type") == "sayall" and "from" in response:
-                print(f"\n{response['from']}: {response['message']}")
-                print(SHELL_PROMPT, end="", flush=True)
+            if self._handle_async_response(response):
                 continue
 
             self.responses.put(response)
