@@ -65,6 +65,10 @@ class MUDClientShell(cmd.Cmd):
             print(render_monster(response["name"], response["hello"]))
             return
 
+        if response_type == "movemonsters":
+            print(response["message"])
+            return
+
         print(response.get("message", "Unknown server response"))
 
     def run_command(self, line: str) -> bool:
@@ -148,6 +152,16 @@ class MUDClientShell(cmd.Cmd):
         print("    sayall PREVED")
         print('    sayall "Let\'s attack dragon at 5 9"')
 
+    def do_movemonsters(self, arg: str) -> None:
+        """Enable or disable wandering monsters on the server."""
+        self.run_command(f"movemonsters {arg}")
+
+    def help_movemonsters(self) -> None:
+        """Show help for the movemonsters command."""
+        print("movemonsters on")
+        print("movemonsters off")
+        print("    Enable or disable wandering monsters on the server.")
+
     def help_help(self) -> None:
         """Show help for the help command."""
         print("help [command]")
@@ -203,6 +217,7 @@ class MUDClientShell(cmd.Cmd):
             "addmon",
             "attack",
             "sayall",
+            "movemonsters",
             "help",
         ]
         return [name for name in commands if name.startswith(text)]

@@ -48,13 +48,18 @@ class Player:
 class GameServer:
     """Store the shared game state for all players."""
 
-    def __init__(self, monster_move_interval: float = MONSTER_MOVE_INTERVAL) -> None:
+    def __init__(
+        self,
+        monster_move_interval: float = MONSTER_MOVE_INTERVAL,
+        moving_monsters_enabled: bool = True,
+    ) -> None:
         """Initialize the in-memory game state."""
         self.monsters: dict[Position, Monster] = {}
         self.players: dict[str, Player] = {}
         self.lock = threading.Lock()
         self.next_player_id = 1
         self.monster_move_interval = monster_move_interval
+        self.moving_monsters_enabled = moving_monsters_enabled
         self.stop_event = threading.Event()
         self.monster_thread: threading.Thread | None = None
 
@@ -220,6 +225,24 @@ class GameServer:
             "result": "ok",
         }
 
+    def _handle_movemonsters(self, parts: list[str]) -> Payload:
+        """Handle toggling the wandering-monster mode on the server."""
+        if len(parts) != 2:
+            return error_response()
+
+        state = parts[1]
+        if state not in {"on", "off"}:
+            return error_response()
+
+        with self.lock:
+            self.moving_monsters_enabled = state == "on"
+
+        return {
+            "type": "movemonsters",
+            "enabled": self.moving_monsters_enabled,
+            "message": f"Moving monsters: {state}",
+        }
+
     def _players_at_position(self, position: Position) -> list[Player]:
         """Return all players currently standing on a given cell."""
         return [
@@ -280,7 +303,10 @@ class GameServer:
     def _monster_wander_loop(self) -> None:
         """Periodically move monsters until the server is stopped."""
         while not self.stop_event.wait(self.monster_move_interval):
-            self.move_random_monster()
+            with self.lock:
+                moving_monsters_enabled = self.moving_monsters_enabled
+            if moving_monsters_enabled:
+                self.move_random_monster()
 
     def start_monster_wanderer(self) -> None:
         """Start the background thread that moves monsters."""
@@ -320,6 +346,8 @@ class GameServer:
             return self._handle_attack(player, parts)
         if command == "sayall":
             return self._handle_sayall(player, parts)
+        if command == "movemonsters":
+            return self._handle_movemonsters(parts)
         return error_response("Invalid command")
 
 
@@ -357,9 +385,8 @@ def serve(
     enable_monster_wander: bool = True,
 ) -> None:
     """Start the MOOD server and serve clients forever."""
-    game = GameServer()
-    if enable_monster_wander:
-        game.start_monster_wanderer()
+    game = GameServer(moving_monsters_enabled=enable_monster_wander)
+    game.start_monster_wanderer()
     try:
         with socket.create_server((host, port)) as server_socket:
             print(f"Server listening on {host}:{port}")
@@ -372,5 +399,4 @@ def serve(
                 )
                 thread.start()
     finally:
-        if enable_monster_wander:
-            game.stop_monster_wanderer()
+        game.stop_monster_wanderer()

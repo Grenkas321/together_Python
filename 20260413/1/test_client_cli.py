@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from mood.client.cli import CommandFileRunner, build_parser, main
+from mood.client.commands import translate_user_command
 
 
 class FakeShell:
@@ -74,6 +75,28 @@ class CommandFileRunnerTests(unittest.TestCase):
         shell.cmdloop.assert_not_called()
         shell.run_command.assert_called_once_with("up")
         transport_cls.return_value.close.assert_called_once_with()
+
+
+class ClientCommandTranslationTests(unittest.TestCase):
+    """Verify translation of client shell commands."""
+
+    def test_translate_movemonsters_command(self) -> None:
+        """The client should translate the movemonsters shell command."""
+        self.assertEqual(
+            translate_user_command("movemonsters on"),
+            ("movemonsters on", None),
+        )
+        self.assertEqual(
+            translate_user_command("movemonsters off"),
+            ("movemonsters off", None),
+        )
+
+    def test_translate_movemonsters_rejects_invalid_arguments(self) -> None:
+        """The client should reject malformed movemonsters commands."""
+        self.assertEqual(
+            translate_user_command("movemonsters maybe"),
+            (None, "Invalid arguments"),
+        )
 
 
 class ServerCliTests(unittest.TestCase):

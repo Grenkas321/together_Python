@@ -11,6 +11,11 @@ from mood.server.core import GameServer, Monster
 class GameServerMonsterMovementTests(unittest.TestCase):
     """Verify random monster movement and encounter notifications."""
 
+    def test_moving_monsters_are_enabled_by_default(self) -> None:
+        """The server should start with wandering monsters enabled."""
+        game = GameServer()
+        self.assertTrue(game.moving_monsters_enabled)
+
     def test_move_random_monster_broadcasts_direction(self) -> None:
         """A successful move should broadcast its direction to players."""
         game = GameServer()
@@ -77,6 +82,28 @@ class GameServerMonsterMovementTests(unittest.TestCase):
         self.assertEqual(payloads[1]["type"], "encounter")
         self.assertEqual(payloads[1]["name"], "dragon")
         self.assertEqual(payloads[1]["hello"], "I am dragon")
+
+    def test_movemonsters_command_turns_wandering_off(self) -> None:
+        """The server should disable wandering monsters on request."""
+        game = GameServer()
+        player = game.add_player(StringIO())
+
+        response = game.handle_command(player, "movemonsters off")
+
+        self.assertFalse(game.moving_monsters_enabled)
+        self.assertEqual(response["type"], "movemonsters")
+        self.assertEqual(response["message"], "Moving monsters: off")
+
+    def test_movemonsters_command_turns_wandering_on(self) -> None:
+        """The server should enable wandering monsters on request."""
+        game = GameServer(moving_monsters_enabled=False)
+        player = game.add_player(StringIO())
+
+        response = game.handle_command(player, "movemonsters on")
+
+        self.assertTrue(game.moving_monsters_enabled)
+        self.assertEqual(response["type"], "movemonsters")
+        self.assertEqual(response["message"], "Moving monsters: on")
 
 
 if __name__ == "__main__":
