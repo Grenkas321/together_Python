@@ -153,6 +153,10 @@ def translate_user_command(line: str) -> tuple[str | None, str | None]:
         if len(parts) != 2 or parts[1] not in {"on", "off"}:
             return None, "Invalid arguments"
         return f"movemonsters {parts[1]}", None
+    if command == "locale":
+        if len(parts) != 2:
+            return None, "Invalid arguments"
+        return f"locale {shlex.quote(parts[1])}", None
     return None, "Invalid command"
 
 

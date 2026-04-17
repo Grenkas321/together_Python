@@ -98,6 +98,20 @@ class ClientCommandTranslationTests(unittest.TestCase):
             (None, "Invalid arguments"),
         )
 
+    def test_translate_locale_command(self) -> None:
+        """The client should pass the locale command through to the server."""
+        self.assertEqual(
+            translate_user_command("locale ru_RU.UTF8"),
+            ("locale ru_RU.UTF8", None),
+        )
+
+    def test_translate_locale_rejects_invalid_arguments(self) -> None:
+        """The client should reject malformed locale commands."""
+        self.assertEqual(
+            translate_user_command("locale"),
+            (None, "Invalid arguments"),
+        )
+
 
 class ServerCliTests(unittest.TestCase):
     """Verify server command-line options."""

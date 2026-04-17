@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 python-cowsay = "*"
+Babel = "*"
 
 [dev-packages]
 sphinx = "*"

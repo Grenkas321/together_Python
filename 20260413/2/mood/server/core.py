@@ -15,6 +15,7 @@ from mood.common.constants import (
     MONSTER_MOVE_INTERVAL,
 )
 from mood.common.protocol import Payload, error_response
+from mood.server.i18n import DEFAULT_LOCALE, ServerTranslator
 
 Position = tuple[int, int]
 DIRECTION_STEPS = (
@@ -42,6 +43,7 @@ class Player:
     writer: TextIO
     x: int = 0
     y: int = 0
+    locale_name: str = DEFAULT_LOCALE
     send_lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -62,6 +64,7 @@ class GameServer:
         self.moving_monsters_enabled = moving_monsters_enabled
         self.stop_event = threading.Event()
         self.monster_thread: threading.Thread | None = None
+        self.translator = ServerTranslator()
 
     def wrap_position(self, value: int) -> int:
         """Wrap a coordinate around the toroidal playing field."""
@@ -83,17 +86,31 @@ class GameServer:
 
     def send_to_player(self, player: Player, payload: Payload) -> None:
         """Send a JSON payload to a single player."""
+        localized_payload = self.translator.localize_payload(
+            player.locale_name,
+            payload,
+        )
         try:
             with player.send_lock:
-                player.writer.write(json.dumps(payload, ensure_ascii=False) + "\n")
+                player.writer.write(
+                    json.dumps(localized_payload, ensure_ascii=False) + "\n"
+                )
                 player.writer.flush()
         except OSError:
             pass
 
-    def broadcast(self, payload: Payload) -> None:
+    def broadcast(
+        self,
+        payload: Payload,
+        excluded_players: set[str] | None = None,
+    ) -> None:
         """Send a payload to every connected player."""
         with self.lock:
-            players = list(self.players.values())
+            players = [
+                player
+                for player in self.players.values()
+                if excluded_players is None or player.name not in excluded_players
+            ]
 
         for player in players:
             self.send_to_player(player, payload)
@@ -128,7 +145,7 @@ class GameServer:
                 "encounter": encounter,
                 }
 
-    def _handle_addmon(self, parts: list[str]) -> Payload:
+    def _handle_addmon(self, player: Player, parts: list[str]) -> Payload:
         """Handle the command that creates or replaces a monster."""
         if len(parts) != 6:
             return error_response()
@@ -151,14 +168,23 @@ class GameServer:
             replaced = (x, y) in self.monsters
             self.monsters[(x, y)] = Monster(monster_name, hello, hp)
 
-        return {
+        response = {
             "type": "addmon",
             "name": monster_name,
             "x": x,
             "y": y,
             "hello": hello,
+            "hp": hp,
             "replaced": replaced,
         }
+        self.broadcast(
+            {
+                **response,
+                "broadcast": True,
+            },
+            excluded_players={player.name},
+        )
+        return response
 
     def _handle_attack(self, player: Player, parts: list[str]) -> Payload:
         """Handle a player attack against a monster on the same cell."""
@@ -175,6 +201,7 @@ class GameServer:
         if damage_limit <= 0:
             return error_response()
 
+        broadcast_payload = None
         with self.lock:
             position = (player.x, player.y)
             monster = self.monsters.get(position)
@@ -199,13 +226,27 @@ class GameServer:
             if monster.hp == 0:
                 del self.monsters[position]
 
-        return {
+            broadcast_payload = {
+                "type": "attack",
+                "result": "ok",
+                "name": monster.name,
+                "damage": damage,
+                "hp": monster.hp,
+                "broadcast": True,
+            }
+
+        response = {
             "type": "attack",
             "result": "ok",
             "name": monster.name,
             "damage": damage,
             "hp": monster.hp,
         }
+        self.broadcast(
+            broadcast_payload,
+            excluded_players={player.name},
+        )
+        return response
 
     def _handle_sayall(self, player: Player, parts: list[str]) -> Payload:
         """Handle a broadcast chat message from a player."""
@@ -240,7 +281,17 @@ class GameServer:
         return {
             "type": "movemonsters",
             "enabled": self.moving_monsters_enabled,
-            "message": f"Moving monsters: {state}",
+        }
+
+    def _handle_locale(self, player: Player, parts: list[str]) -> Payload:
+        """Handle setting the preferred locale for one client."""
+        if len(parts) != 2:
+            return error_response()
+
+        player.locale_name = parts[1]
+        return {
+            "type": "locale",
+            "locale": player.locale_name,
         }
 
     def _players_at_position(self, position: Position) -> list[Player]:
@@ -290,7 +341,7 @@ class GameServer:
                     "type": "monster_move",
                     "name": monster.name,
                     "direction": direction,
-                    "message": f"{monster.name} moved one cell {direction}",
+                    "broadcast": True,
                 }
                 encounter_payload = self._build_encounter_payload(monster)
                 break
@@ -341,13 +392,15 @@ class GameServer:
         if command == "move":
             return self._handle_move(player, parts)
         if command == "addmon":
-            return self._handle_addmon(parts)
+            return self._handle_addmon(player, parts)
         if command == "attack":
             return self._handle_attack(player, parts)
         if command == "sayall":
             return self._handle_sayall(player, parts)
         if command == "movemonsters":
             return self._handle_movemonsters(parts)
+        if command == "locale":
+            return self._handle_locale(player, parts)
         return error_response("Invalid command")
 
 
@@ -363,6 +416,13 @@ def handle_client_connection(
 
         player = game.add_player(writer)
         print(f"Client connected: {address}, name={player.name}")
+        game.broadcast(
+            {
+                "type": "player_joined",
+                "name": player.name,
+                "broadcast": True,
+            }
+        )
 
         try:
             for line in reader:
@@ -377,6 +437,13 @@ def handle_client_connection(
         finally:
             print(f"Client disconnected: {address}, name={player.name}")
             game.remove_player(player)
+            game.broadcast(
+                {
+                    "type": "player_left",
+                    "name": player.name,
+                    "broadcast": True,
+                }
+            )
 
 
 def serve(

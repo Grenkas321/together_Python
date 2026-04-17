@@ -24,3 +24,10 @@
 .. automodule:: mood.server.cli
    :members:
    :show-inheritance:
+
+Модуль ``mood.server.i18n``
+---------------------------
+
+.. automodule:: mood.server.i18n
+   :members:
+   :show-inheritance:

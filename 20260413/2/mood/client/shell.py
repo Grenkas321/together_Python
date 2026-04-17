@@ -22,6 +22,12 @@ class MUDClientShell(cmd.Cmd):
 
     def _print_response(self, response: Payload) -> None:
         response_type = response["type"]
+        messages = response.get("messages")
+        if isinstance(messages, list):
+            for message in messages:
+                print(message)
+            return
+
         if response_type == "move":
             print(f"Moved to ({response['x']}, {response['y']})")
             encounter = response["encounter"]
@@ -29,43 +35,15 @@ class MUDClientShell(cmd.Cmd):
                 print(render_monster(encounter["name"], encounter["hello"]))
             return
 
-        if response_type == "addmon":
-            print(
-                f"Added monster {response['name']} to "
-                f"({response['x']}, {response['y']}) saying {response['hello']}"
-            )
-            if response["replaced"]:
-                print("Replaced the old monster")
-            return
-
-        if response_type == "attack":
-            if response["result"] == "no_monster":
-                if response["name"] is None:
-                    print("No monster here")
-                else:
-                    print(f"No {response['name']} here")
-                return
-
-            print(f"Attacked {response['name']}, damage {response['damage']} hp")
-            if response["hp"] == 0:
-                print(f"{response['name']} died")
-            else:
-                print(f"{response['name']} now has {response['hp']}")
-            return
-
         if response_type == "sayall" and response.get("result") == "ok":
             print("Message sent")
-            return
-
-        if response_type == "monster_move":
-            print(response["message"])
             return
 
         if response_type == "encounter":
             print(render_monster(response["name"], response["hello"]))
             return
 
-        if response_type == "movemonsters":
+        if response_type in {"locale", "monster_move", "movemonsters"}:
             print(response["message"])
             return
 
@@ -162,6 +140,15 @@ class MUDClientShell(cmd.Cmd):
         print("movemonsters off")
         print("    Enable or disable wandering monsters on the server.")
 
+    def do_locale(self, arg: str) -> None:
+        """Set the preferred locale for server-side messages."""
+        self.run_command(f"locale {arg}")
+
+    def help_locale(self) -> None:
+        """Show help for the locale command."""
+        print("locale <locale_name>")
+        print("    Example: locale ru_RU.UTF8")
+
     def help_help(self) -> None:
         """Show help for the help command."""
         print("help [command]")
@@ -218,6 +205,7 @@ class MUDClientShell(cmd.Cmd):
             "attack",
             "sayall",
             "movemonsters",
+            "locale",
             "help",
         ]
         return [name for name in commands if name.startswith(text)]
@@ -232,6 +220,18 @@ class MUDClientShell(cmd.Cmd):
         """Disable tab completion for the sayall command."""
         del text, line, begidx, endidx
         return []
+
+    def complete_locale(
+        self,
+        text: str,
+        line: str,
+        begidx: int,
+        endidx: int,
+    ) -> list[str]:
+        """Complete known locale names for the locale command."""
+        del line, begidx, endidx
+        locales = ["ru_RU.UTF8"]
+        return [locale for locale in locales if locale.startswith(text)]
 
     def emptyline(self) -> bool:
         """Ignore an empty command line."""

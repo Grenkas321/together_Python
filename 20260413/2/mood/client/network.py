@@ -32,14 +32,23 @@ class NetworkClient:
         if response.get("type") == "sayall" and "from" in response:
             self._print_async_message(f"{response['from']}: {response['message']}")
             return True
-        if response.get("type") == "monster_move":
-            self._print_async_message(str(response["message"]))
-            return True
         if response.get("type") == "encounter":
             self._print_async_message(
                 render_monster(str(response["name"]), str(response["hello"]))
             )
             return True
+        if response.get("broadcast"):
+            messages = response.get("messages")
+            if isinstance(messages, list):
+                joined_messages = "\n".join(
+                    str(message) for message in messages
+                )
+                self._print_async_message(joined_messages)
+                return True
+            message = response.get("message")
+            if message is not None:
+                self._print_async_message(str(message))
+                return True
         return False
 
     def _reader_loop(self) -> None:

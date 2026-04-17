@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from mood.server.core import GameServer, Monster
+from mood.server.i18n import ServerTranslator
 
 
 class GameServerMonsterMovementTests(unittest.TestCase):
@@ -92,7 +93,9 @@ class GameServerMonsterMovementTests(unittest.TestCase):
 
         self.assertFalse(game.moving_monsters_enabled)
         self.assertEqual(response["type"], "movemonsters")
-        self.assertEqual(response["message"], "Moving monsters: off")
+        game.send_to_player(player, response)
+        payload = json.loads(player.writer.getvalue().splitlines()[-1])
+        self.assertEqual(payload["message"], "Moving monsters: off")
 
     def test_movemonsters_command_turns_wandering_on(self) -> None:
         """The server should enable wandering monsters on request."""
@@ -103,7 +106,112 @@ class GameServerMonsterMovementTests(unittest.TestCase):
 
         self.assertTrue(game.moving_monsters_enabled)
         self.assertEqual(response["type"], "movemonsters")
-        self.assertEqual(response["message"], "Moving monsters: on")
+        game.send_to_player(player, response)
+        payload = json.loads(player.writer.getvalue().splitlines()[-1])
+        self.assertEqual(payload["message"], "Moving monsters: on")
+
+
+class GameServerLocalizationTests(unittest.TestCase):
+    """Verify server-side localization of user-facing messages."""
+
+    def test_hit_points_are_pluralized_for_russian_locale(self) -> None:
+        """Russian hit-point forms should use Babel plural rules."""
+        translator = ServerTranslator()
+
+        self.assertEqual(
+            translator.format_hit_points("ru_RU.UTF8", 1),
+            "1 очко здоровья",
+        )
+        self.assertEqual(
+            translator.format_hit_points("ru_RU.UTF8", 2),
+            "2 очка здоровья",
+        )
+        self.assertEqual(
+            translator.format_hit_points("ru_RU.UTF8", 5),
+            "5 очков здоровья",
+        )
+        self.assertEqual(
+            translator.format_hit_points("ru_RU.UTF8", 21),
+            "21 очко здоровья",
+        )
+
+    def test_locale_command_switches_player_language(self) -> None:
+        """The locale command should change one player's message language."""
+        game = GameServer()
+        writer = StringIO()
+        player = game.add_player(writer)
+
+        response = game.handle_command(player, "locale ru_RU.UTF8")
+        game.send_to_player(player, response)
+
+        payload = json.loads(writer.getvalue().splitlines()[-1])
+        self.assertEqual(player.locale_name, "ru_RU.UTF8")
+        self.assertEqual(payload["type"], "locale")
+        self.assertEqual(payload["message"], "Установлена локаль: ru_RU.UTF8")
+
+    def test_addmon_broadcast_is_localized_for_each_player(self) -> None:
+        """Broadcast messages should be translated for every recipient."""
+        game = GameServer()
+        russian_writer = StringIO()
+        english_writer = StringIO()
+        russian_player = game.add_player(russian_writer)
+        game.add_player(english_writer)
+        russian_player.locale_name = "ru_RU.UTF8"
+
+        response = game.handle_command(
+            russian_player,
+            'addmon dragon 1 2 21 "I am dragon"',
+        )
+        game.send_to_player(russian_player, response)
+
+        russian_payload = json.loads(russian_writer.getvalue().splitlines()[-1])
+        observer_payload = json.loads(english_writer.getvalue().splitlines()[-1])
+
+        self.assertEqual(
+            russian_payload["messages"][0],
+            (
+                "Добавлен монстр dragon в (1, 2), говорит I am dragon, "
+                "здоровье: 21 очко здоровья"
+            ),
+        )
+        self.assertEqual(
+            observer_payload["messages"][0],
+            (
+                "Added monster dragon to (1, 2) saying I am dragon "
+                "with 21 hit points"
+            ),
+        )
+
+    def test_attack_messages_follow_recipient_locale(self) -> None:
+        """Attack notifications should be localized independently per player."""
+        game = GameServer()
+        attacker_writer = StringIO()
+        observer_writer = StringIO()
+        attacker = game.add_player(attacker_writer)
+        game.add_player(observer_writer)
+        attacker.locale_name = "ru_RU.UTF8"
+        game.monsters[(0, 0)] = Monster("dragon", "I am dragon", 5)
+
+        response = game.handle_command(attacker, "attack _current_ 2")
+        game.send_to_player(attacker, response)
+
+        attacker_payload = json.loads(attacker_writer.getvalue().splitlines()[-1])
+        observer_payload = json.loads(observer_writer.getvalue().splitlines()[-1])
+
+        self.assertEqual(
+            attacker_payload["messages"],
+            [
+                "Атакован dragon, урон: 2 очка здоровья",
+                "У dragon осталось 3 очка здоровья",
+            ],
+        )
+        self.assertEqual(
+            observer_payload["messages"],
+            [
+                "Attacked dragon, damage 2 hit points",
+                "dragon now has 3 hit points",
+            ],
+        )
 
 
 if __name__ == "__main__":
