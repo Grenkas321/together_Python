@@ -446,12 +446,16 @@ def handle_client_connection(
             )
 
 
-def serve(
+def run_server(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
     enable_monster_wander: bool = True,
 ) -> None:
-    """Start the MOOD server and serve clients forever."""
+    """Start the MOOD server and serve clients forever.
+
+    This top-level function is convenient both for the command-line entry
+    point and for launching the server in a separate test process.
+    """
     game = GameServer(moving_monsters_enabled=enable_monster_wander)
     game.start_monster_wanderer()
     try:
@@ -467,3 +471,16 @@ def serve(
                 thread.start()
     finally:
         game.stop_monster_wanderer()
+
+
+def serve(
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    enable_monster_wander: bool = True,
+) -> None:
+    """Backward-compatible alias for :func:`run_server`."""
+    run_server(
+        host=host,
+        port=port,
+        enable_monster_wander=enable_monster_wander,
+    )

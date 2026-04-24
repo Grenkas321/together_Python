@@ -4,7 +4,7 @@ import argparse
 from collections.abc import Sequence
 
 from mood.common.constants import DEFAULT_HOST, DEFAULT_PORT
-from mood.server.core import serve
+from mood.server.core import run_server
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the MOOD server from the command line."""
     args = build_parser().parse_args(argv)
-    serve(
+    run_server(
         host=args.host,
         port=args.port,
         enable_monster_wander=not args.no_monster_wander,

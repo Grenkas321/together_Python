@@ -128,13 +128,13 @@ class ServerCliTests(unittest.TestCase):
 
     def test_server_main_disables_monster_wandering(self) -> None:
         """The server CLI should pass the disable flag to ``serve``."""
-        with patch("mood.server.cli.serve") as serve_mock:
+        with patch("mood.server.cli.run_server") as run_server_mock:
             from mood.server.cli import main as server_main
 
             exit_code = server_main(["--no-monster-wander"])
 
         self.assertEqual(exit_code, 0)
-        serve_mock.assert_called_once_with(
+        run_server_mock.assert_called_once_with(
             host="127.0.0.1",
             port=1337,
             enable_monster_wander=False,
