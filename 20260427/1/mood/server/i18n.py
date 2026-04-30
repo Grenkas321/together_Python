@@ -102,10 +102,10 @@ class ServerTranslator:
                 "Set up locale: {locale}",
             ).format(locale=payload["locale"])
         elif payload_type == "movemonsters":
-            state = self.gettext(
-                locale_name,
-                "on" if bool(payload["enabled"]) else "off",
-            )
+            if bool(payload["enabled"]):
+                state = self.gettext(locale_name, "on")
+            else:
+                state = self.gettext(locale_name, "off")
             localized["message"] = self.gettext(
                 locale_name,
                 "Moving monsters: {state}",
@@ -177,3 +177,10 @@ class ServerTranslator:
                 )
             )
         return messages
+
+    def _catalog_hints(self, locale_name: str | None) -> None:
+        """Keep dynamic message ids visible to Babel extraction."""
+        self.gettext(locale_name, "right")
+        self.gettext(locale_name, "left")
+        self.gettext(locale_name, "up")
+        self.gettext(locale_name, "down")
