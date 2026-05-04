@@ -30,5 +30,5 @@ def task_mo():
 def task_wheel():
     return {
         'actions': ["pyproject-build -w"],
-        'task_dep': ["mo"]
+        'task_dep': ["erase", "mo"]
         }
