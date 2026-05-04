@@ -5,7 +5,7 @@ lang = "ru_RU.UTF-8"
 
 def task_erase():
     return {
-            "actions": ["rm -f po/*/*/*.mo"],
+            "actions": ["rm -f wordcount/*/*/*.mo"],
             }
 
 def task_dist():
@@ -25,4 +25,10 @@ def task_mo():
         ],
             'file_dep': [f"{SPATH}/{PROJECT}.po"],
             'targets': [f"{DPATH}/{PROJECT}.mo"],
+        }
+
+def task_wheel():
+    return {
+        'actions': ["pyproject-build -w"],
+        'task_dep': ["mo"]
         }
