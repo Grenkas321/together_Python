@@ -1,0 +1,17 @@
+MANIFEST.in
+README.md
+dodo.py
+pyproject.toml
+Wordcount/__init__.py
+Wordcount/__main__.py
+Wordcount.egg-info/PKG-INFO
+Wordcount.egg-info/SOURCES.txt
+Wordcount.egg-info/dependency_links.txt
+Wordcount.egg-info/top_level.txt
+Wordcount/__pycache__/__init__.cpython-313.pyc
+Wordcount/__pycache__/__main__.cpython-313.pyc
+Wordcount/ru_RU.UTF-8/LC_MESSAGES/wordcount.mo
+po/ru_RU.UTF-8/LC_MESSAGES/wordcount.po
+wordcount/__init__.py
+wordcount/__main__.py
+wordcount/ru_RU.UTF-8/LC_MESSAGES/wordcount.mo

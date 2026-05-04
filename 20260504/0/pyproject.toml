@@ -1,0 +1,14 @@
+[project]
+name="Wordcount"
+description="Words counter"
+version="0.0.1"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-dir]
+wordcount="wordcount"
+
+[tool.setuptools.package-data]
+wordcount=["*/*/*.mo"]
