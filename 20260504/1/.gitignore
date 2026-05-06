@@ -1,0 +1,7 @@
+.venv/
+.doit.db
+.doit/
+docs/_build/
+mood/server/locale/*.pot
+__pycache__/
+*.pyc
