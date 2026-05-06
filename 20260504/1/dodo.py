@@ -13,7 +13,7 @@ DOMAIN = "mood_server"
 POT_FILE = LOCALE_DIR / f"{DOMAIN}.pot"
 PO_FILE = LOCALE_DIR / "ru_RU/LC_MESSAGES" / f"{DOMAIN}.po"
 MO_FILE = LOCALE_DIR / "ru_RU/LC_MESSAGES" / f"{DOMAIN}.mo"
-DOC_BUILD_DIR = Path("docs/_build")
+DOC_BUILD_DIR = Path("mood/docs")
 TEST_STAMP = Path(".doit") / "test.stamp"
 I18N_STAMP = Path(".doit") / "i18n.stamp"
 
@@ -123,7 +123,7 @@ def task_i18n():
 def task_html():
     """Generate HTML documentation."""
     return {
-        "actions": [f"{PYTHON} -m sphinx -M html docs docs/_build"],
+        "actions": [f"{PYTHON} -m sphinx -M html docs {DOC_BUILD_DIR}"],
         "file_dep": source_files("docs/**/*.rst")
         + source_files("docs/**/*.py")
         + source_files("mood/**/*.py"),

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mood"
+version = "0.1.0"
+description = "Multiplayer Object-Oriented Dungeon client and server."
+readme = "docs/index.rst"
+requires-python = ">=3.13"
+dependencies = [
+    "Babel",
+    "python-cowsay",
+]
+
+[project.scripts]
+mood-client = "mood.client.cli:main"
+mood-server = "mood.server.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mood*"]
+
+[tool.setuptools.package-data]
+"mood.client" = ["jgsbat.txt"]
+"mood.server" = ["locale/ru_RU/LC_MESSAGES/mood_server.mo"]
+"mood.docs" = ["html/**/*"]

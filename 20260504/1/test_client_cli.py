@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 from mood.client.cli import CommandFileRunner, build_parser, main
 from mood.client.commands import translate_user_command
+from mood.client.documentation import documentation_index, open_documentation
+from mood.client.shell import MUDClientShell
 
 
 class FakeShell:
@@ -111,6 +113,43 @@ class ClientCommandTranslationTests(unittest.TestCase):
             translate_user_command("locale"),
             (None, "Invalid arguments"),
         )
+
+
+class ClientDocumentationTests(unittest.TestCase):
+    """Verify opening generated client documentation."""
+
+    def test_documentation_index_points_to_packaged_html(self) -> None:
+        """The documentation resource should resolve to generated HTML."""
+        self.assertTrue(documentation_index().endswith("html\\index.html"))
+
+    def test_open_documentation_uses_webbrowser_open(self) -> None:
+        """The documentation command should delegate to ``webbrowser.open``."""
+        with patch("mood.client.documentation.webbrowser.open") as open_mock:
+            open_mock.return_value = True
+
+            self.assertTrue(open_documentation())
+
+        open_mock.assert_called_once()
+        self.assertTrue(open_mock.call_args.args[0].endswith("html\\index.html"))
+
+    def test_shell_documentation_command_rejects_arguments(self) -> None:
+        """The shell documentation command should not contact the server."""
+        shell = MUDClientShell(transport=object())
+
+        with patch("builtins.print") as print_mock:
+            shell.do_documentation("extra")
+
+        print_mock.assert_called_once_with("Invalid arguments")
+
+    def test_shell_documentation_command_opens_browser(self) -> None:
+        """The shell documentation command should open local docs."""
+        shell = MUDClientShell(transport=object())
+
+        with patch("mood.client.shell.open_documentation", return_value=True):
+            with patch("builtins.print") as print_mock:
+                shell.do_documentation("")
+
+        print_mock.assert_called_once_with("Documentation opened")
 
 
 class ServerCliTests(unittest.TestCase):

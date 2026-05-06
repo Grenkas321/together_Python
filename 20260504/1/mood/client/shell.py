@@ -4,6 +4,7 @@ import cmd
 import shlex
 
 from mood.client.commands import translate_user_command
+from mood.client.documentation import open_documentation
 from mood.client.network import NetworkClient
 from mood.client.rendering import available_monsters, render_monster
 from mood.common.constants import SHELL_PROMPT, WEAPONS, WELCOME_TEXT
@@ -149,6 +150,21 @@ class MUDClientShell(cmd.Cmd):
         print("locale <locale_name>")
         print("    Example: locale ru_RU.UTF8")
 
+    def do_documentation(self, arg: str) -> None:
+        """Open generated documentation in the default browser."""
+        if arg:
+            print("Invalid arguments")
+            return
+        if open_documentation():
+            print("Documentation opened")
+            return
+        print("Failed to open documentation")
+
+    def help_documentation(self) -> None:
+        """Show help for the documentation command."""
+        print("documentation")
+        print("    Open generated HTML documentation in browser.")
+
     def help_help(self) -> None:
         """Show help for the help command."""
         print("help [command]")
@@ -206,6 +222,7 @@ class MUDClientShell(cmd.Cmd):
             "sayall",
             "movemonsters",
             "locale",
+            "documentation",
             "help",
         ]
         return [name for name in commands if name.startswith(text)]

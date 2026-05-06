@@ -1,7 +1,13 @@
 .venv/
 .doit.db
 .doit/
+.verify/
+build/
+dist/
+*.egg-info/
 docs/_build/
+mood/docs/html/
+mood/docs/doctrees/
 mood/server/locale/*.pot
 __pycache__/
 *.pyc

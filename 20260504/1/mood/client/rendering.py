@@ -1,5 +1,6 @@
 """Client-side monster rendering helpers for MOOD."""
 
+from importlib.resources import files
 from io import StringIO
 
 try:
@@ -20,23 +21,7 @@ def available_monsters() -> list[str]:
 
 if read_dot_cow is not None:
     JGSBAT = read_dot_cow(
-        StringIO(
-            """
-$the_cow = <<EOC;
-         $thoughts
-          $thoughts
-    ,_                    _,
-    ) '-._  ,_    _,  _.-' (
-    )  _.-'.|\\--//|.'-._  (
-     )'   .'\\/o\\/o\\/'.   `(
-      ) .' . \\====/ . '. (
-       )  / <<    >> \\  (
-        '-._/``  ``\\_.-'
-  jgs     __\\\\'--'//__
-         (((""`  `"")))
-EOC
-"""
-        )
+        StringIO(files("mood.client").joinpath("jgsbat.txt").read_text())
     )
 else:
     JGSBAT = None
